@@ -1,0 +1,12 @@
+schema_version: 1.0.0
+slug: dylan-patel
+display_name_zh: Dylan Patel / SemiAnalysis
+enabled: true
+mode: evidence_first
+source_roles:
+  personal_expression:
+    - dylan-patel
+  institutional_expression:
+    - semianalysis
+  third_party_reporting:
+    - external-mentions

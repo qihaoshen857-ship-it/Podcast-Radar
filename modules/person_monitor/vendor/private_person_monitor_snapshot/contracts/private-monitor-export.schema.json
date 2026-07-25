@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.private-person-monitor/contracts/private-monitor-export.schema.json",
+  "title": "Private Person Monitor person export",
+  "type": "object",
+  "required": ["schema_version", "generated_at", "producer", "person", "topics", "source_status", "items", "item_count"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "producer": {
+      "type": "object",
+      "required": ["name", "version"],
+      "properties": {
+        "name": {"const": "private-person-monitor"},
+        "version": {"type": "string"}
+      },
+      "additionalProperties": false
+    },
+    "person": {
+      "type": "object",
+      "required": ["slug", "canonical_name", "display_name_zh", "roles", "official_profiles"],
+      "properties": {
+        "slug": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]+$"},
+        "canonical_name": {"type": "string"},
+        "display_name_zh": {"type": "string"},
+        "organization": {"type": ["string", "null"]},
+        "roles": {"type": "array", "items": {"type": "string"}},
+        "official_profiles": {"type": "array", "items": {"type": "string", "format": "uri"}}
+      },
+      "additionalProperties": false
+    },
+    "topics": {"type": "array"},
+    "source_status": {"type": "array"},
+    "items": {"type": "array"},
+    "item_count": {"type": "integer", "minimum": 0}
+  },
+  "additionalProperties": false
+}

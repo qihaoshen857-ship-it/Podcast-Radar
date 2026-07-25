@@ -1,0 +1,12 @@
+yt-dlp>=2026.3.17
+requests>=2.32.3
+dashscope>=1.25.19
+python-dotenv>=1.0.1
+librosa>=0.11.0
+soundfile>=0.13.1
+silero-vad>=6.2.1
+pydub>=0.25.1
+numpy>=2.0.0
+websocket-client>=1.8.0
+imageio-ffmpeg>=0.6.0
+Pillow>=10.4.0

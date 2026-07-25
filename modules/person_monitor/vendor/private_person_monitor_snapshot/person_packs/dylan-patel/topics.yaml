@@ -1,0 +1,59 @@
+schema_version: 0.1.0
+person_slug: dylan-patel
+
+topics:
+  - slug: ai-infrastructure
+    name_zh: AI 基础设施
+    aliases:
+      - AI infrastructure
+      - AI compute
+      - datacenter infrastructure
+
+  - slug: semiconductors
+    name_zh: 半导体
+    aliases:
+      - semiconductor
+      - chips
+
+  - slug: accelerators
+    name_zh: AI 加速器
+    parent: semiconductors
+    aliases:
+      - GPU
+      - TPU
+      - accelerator
+
+  - slug: memory
+    name_zh: 存储与 HBM
+    parent: semiconductors
+    aliases:
+      - HBM
+      - DRAM
+      - memory bandwidth
+
+  - slug: foundry-and-packaging
+    name_zh: 晶圆代工与先进封装
+    parent: semiconductors
+    aliases:
+      - foundry
+      - advanced packaging
+      - CoWoS
+
+  - slug: cloud-computing
+    name_zh: 云计算
+    aliases:
+      - cloud
+      - hyperscaler
+
+  - slug: ai-models
+    name_zh: AI 模型
+    aliases:
+      - foundation model
+      - large language model
+      - inference
+      - training
+
+topic_policy:
+  model_may_propose_new_topic: true
+  new_topic_requires_review: true
+  aliases_are_case_insensitive: true

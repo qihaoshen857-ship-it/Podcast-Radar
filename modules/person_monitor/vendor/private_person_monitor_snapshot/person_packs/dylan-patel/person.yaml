@@ -1,0 +1,30 @@
+schema_version: 0.1.0
+person:
+  slug: dylan-patel
+  canonical_name: Dylan Patel
+  organization: SemiAnalysis
+  roles:
+    - founder
+    - chief_executive_officer
+    - chief_analyst
+  aliases:
+    strong:
+      - Dylan Patel
+      - Dylan Patel SemiAnalysis
+    organization:
+      - SemiAnalysis
+      - Semi Analysis
+    rejected_or_ambiguous:
+      - Dylan
+  official_profiles:
+    - https://semianalysis.com/dylan-patel/
+  core_languages:
+    - en
+  output_language: zh-CN
+
+identity_policy:
+  direct_expression_required_for_core_library: true
+  third_party_mentions_are_related_reporting: true
+  title_only_match_requires_review: true
+  low_confidence_action: needs_review
+  never_infer_identity_from_opinion_style: true

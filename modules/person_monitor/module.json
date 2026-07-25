@@ -1,0 +1,19 @@
+{
+  "schema_version": "1.0.0",
+  "module_id": "person-monitor",
+  "module_version": "0.2.0",
+  "host_base_version": "0.4.29",
+  "host_base_main_sha256": "e1062c857090c5eb5b81aeeb0d9dce27069864af3f39b3def7b1ecd62e7f9722",
+  "source_snapshot": {
+    "repository": "private-person-monitor",
+    "commit": "e280a79",
+    "what_he_said_commit": "67d31e4e25afbcdfd1d4727b5d04e3118696289b"
+  },
+  "runtime_policy": {
+    "lazy_load": true,
+    "automatic_network_on_host_startup": false,
+    "runtime_import_from_what_he_said": false,
+    "failure_isolated_from_host": true,
+    "data_subdirectory": "ResearchPodcastRadar/person-monitor"
+  }
+}

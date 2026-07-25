@@ -1,0 +1,52 @@
+schema_version: 0.1.0
+person_slug: elon-musk
+
+topics:
+  - slug: artificial-intelligence
+    name_zh: 人工智能与 xAI
+    aliases: [artificial intelligence, AI, xAI, Grok, AGI]
+
+  - slug: autonomous-driving
+    name_zh: 自动驾驶与 Robotaxi
+    aliases: [FSD, Full Self-Driving, Autopilot, Robotaxi, Cybercab]
+
+  - slug: robotics
+    name_zh: 机器人与 Optimus
+    aliases: [Optimus, humanoid robot, robotics]
+
+  - slug: electric-vehicles
+    name_zh: 电动车与 Tesla 产品
+    aliases: [Tesla, EV, Model 3, Model Y, Cybertruck, Semi]
+
+  - slug: energy-and-storage
+    name_zh: 能源与储能
+    aliases: [Megapack, Powerwall, solar, battery, energy storage]
+
+  - slug: space-and-launch
+    name_zh: 航天、火箭与火星
+    aliases: [SpaceX, Starship, Falcon, Mars, launch]
+
+  - slug: satellite-communications
+    name_zh: 卫星通信与 Starlink
+    aliases: [Starlink, satellite, direct to cell]
+
+  - slug: social-platform
+    name_zh: X 平台与内容治理
+    aliases: [X Corp, Twitter, free speech, content moderation]
+
+  - slug: brain-computer-interface
+    name_zh: 脑机接口与 Neuralink
+    aliases: [Neuralink, brain-computer interface, BCI]
+
+  - slug: manufacturing-and-compute
+    name_zh: 制造、算力与基础设施
+    aliases: [Gigafactory, Dojo, data center, compute, chip, manufacturing]
+
+  - slug: capital-allocation
+    name_zh: 资本配置与公司治理
+    aliases: [capital allocation, compensation, governance, financing]
+
+topic_policy:
+  model_may_propose_new_topic: true
+  new_topic_requires_review: true
+  aliases_are_case_insensitive: true

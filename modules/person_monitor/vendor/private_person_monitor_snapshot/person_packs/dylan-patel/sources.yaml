@@ -1,0 +1,461 @@
+schema_version: 0.1.0
+person_slug: dylan-patel
+
+defaults:
+  schedule: daily
+  lookback_overlap_hours: 48
+  manual_url_is_primary: false
+  manual_url_mode: advanced_fallback
+
+# M1 首次来源研究后由主 Agent 填入已验证的固定频道；
+# 目录搜索和关键词搜索只是扩展发现，不替代稳定订阅源。
+fixed_feeds:
+  podcast_rss:
+    - key: dwarkesh-podcast-rss
+      name: Dwarkesh Podcast 官方 RSS
+      locator: https://www.dwarkesh.com/feed
+      priority: 100
+      enabled: true
+      fetch_cooldown_hours: 24
+      expected_role: guest_or_speaker
+      queries:
+        - Dylan Patel
+        - SemiAnalysis
+      notes: Stable public RSS; identity scoring keeps only episodes attributable to Dylan Patel.
+
+    - key: lex-fridman-podcast-rss
+      name: Lex Fridman Podcast 官方 RSS
+      locator: https://lexfridman.com/feed/podcast/
+      priority: 100
+      enabled: true
+      fetch_cooldown_hours: 24
+      expected_role: guest_or_speaker
+      queries:
+        - Dylan Patel
+        - SemiAnalysis
+      notes: Stable public RSS; includes historical Dylan Patel appearances.
+
+    - key: semianalysis-weekly-podcast-rss
+      name: SemiAnalysis Weekly 官方 RSS
+      locator: https://anchor.fm/s/10fbee758/podcast/rss
+      priority: 112
+      enabled: true
+      fetch_cooldown_hours: 24
+      expected_role: guest_or_speaker
+      queries:
+        - Dylan Patel
+      notes: SemiAnalysis team feed; only episodes explicitly identifying Dylan are emitted.
+
+    - key: training-data-podcast-rss
+      name: Training Data 官方 RSS
+      locator: https://feeds.megaphone.fm/trainingdata
+      priority: 106
+      enabled: true
+      fetch_cooldown_hours: 24
+      expected_role: guest_or_speaker
+      generation: 2
+      queries: &dylan_podcast_queries
+        - Dylan Patel
+        - SemiAnalysis
+
+    - key: invest-like-best-podcast-rss
+      name: Invest Like the Best 官方 RSS
+      locator: https://feeds.megaphone.fm/CLS2859450455
+      priority: 110
+      enabled: true
+      fetch_cooldown_hours: 24
+      expected_role: guest_or_speaker
+      queries: *dylan_podcast_queries
+
+    - key: mad-podcast-rss
+      name: The MAD Podcast 官方 RSS
+      locator: https://anchor.fm/s/f2ee4948/podcast/rss
+      priority: 110
+      enabled: true
+      fetch_cooldown_hours: 24
+      expected_role: guest_or_speaker
+      queries: *dylan_podcast_queries
+
+    - key: tbpn-podcast-rss
+      name: TBPN 官方 RSS
+      locator: https://feeds.transistor.fm/technology-brother
+      priority: 108
+      enabled: true
+      fetch_cooldown_hours: 24
+      expected_role: guest_or_speaker
+      queries:
+        - Dylan Patel
+
+    - key: wisdomtree-next-big-podcast-rss
+      name: WisdomTree The Next Big Thing 官方 RSS
+      locator: https://anchor.fm/s/e244f894/podcast/rss
+      priority: 110
+      enabled: true
+      fetch_cooldown_hours: 24
+      expected_role: guest_or_speaker
+      queries: *dylan_podcast_queries
+
+    - key: a16z-podcast-rss
+      name: a16z Podcast 官方 RSS
+      locator: https://feeds.simplecast.com/JGE3yC0V
+      priority: 110
+      enabled: true
+      fetch_cooldown_hours: 24
+      expected_role: guest_or_speaker
+      queries: *dylan_podcast_queries
+      replay_provider_id_map:
+        85d11fb3-6ad6-4d00-b9dc-b18d529041d0: d0aeeb24-ce80-45f9-bffb-05b78f50fd72
+      replay_url_map:
+        85d11fb3-6ad6-4d00-b9dc-b18d529041d0: https://a16z.simplecast.com/episodes/dylan-patel-B_VCGn95
+
+    - key: no-priors-podcast-rss
+      name: No Priors 官方 RSS
+      locator: https://feeds.megaphone.fm/nopriors
+      priority: 108
+      enabled: true
+      fetch_cooldown_hours: 24
+      expected_role: guest_or_speaker
+      generation: 2
+      queries: *dylan_podcast_queries
+
+    - key: chinatalk-podcast-rss
+      name: ChinaTalk 官方 RSS
+      locator: https://feeds.megaphone.fm/CHTAL4990341033
+      priority: 108
+      enabled: true
+      fetch_cooldown_hours: 24
+      expected_role: guest_or_speaker
+      generation: 3
+      queries: *dylan_podcast_queries
+
+    - key: hidden-forces-podcast-rss
+      name: Hidden Forces 官方 RSS
+      locator: https://hiddenforces.libsyn.com/rss
+      priority: 110
+      enabled: true
+      fetch_cooldown_hours: 168
+      expected_role: guest_or_speaker
+      queries: *dylan_podcast_queries
+      notes: Weekly historical lane; Dylan's 2023 export-controls interview has public audio while the publisher transcript is subscriber-only.
+
+    - key: next-curve-podcast-rss
+      name: neXt Curve reThink 官方 RSS
+      locator: https://feeds.buzzsprout.com/1654726.rss
+      priority: 106
+      enabled: true
+      fetch_cooldown_hours: 168
+      expected_role: guest_or_speaker
+      queries: *dylan_podcast_queries
+      notes: Weekly historical lane for the 2024 NVIDIA Blackwell interview; show notes are discovery metadata, not Evidence.
+
+    - key: origins-podcast-rss
+      name: ORIGINS 官方 RSS
+      locator: https://api.substack.com/feed/podcast/5820936.rss
+      priority: 106
+      enabled: true
+      fetch_cooldown_hours: 24
+      expected_role: guest_or_speaker
+      queries: *dylan_podcast_queries
+
+    - key: big-technology-podcast-rss
+      name: Big Technology Podcast 官方 RSS
+      locator: https://feeds.megaphone.fm/LI3617121267
+      priority: 106
+      enabled: true
+      fetch_cooldown_hours: 24
+      expected_role: guest_or_speaker
+      queries: *dylan_podcast_queries
+
+    - key: unsupervised-learning-podcast-rss
+      name: Unsupervised Learning 官方 RSS
+      locator: https://feeds.simplecast.com/dOSE_bdP
+      priority: 106
+      enabled: true
+      fetch_cooldown_hours: 24
+      expected_role: guest_or_speaker
+      queries: *dylan_podcast_queries
+
+    - key: bg2-podcast-rss
+      name: BG2Pod 官方 RSS
+      locator: https://anchor.fm/s/f06c2370/podcast/rss
+      priority: 104
+      enabled: true
+      fetch_cooldown_hours: 24
+      expected_role: guest_or_speaker
+      queries: *dylan_podcast_queries
+
+    - key: exponential-view-podcast-rss
+      name: Exponential View 官方 RSS
+      locator: https://feeds.simplecast.com/e_GRxR9a
+      priority: 104
+      enabled: true
+      fetch_cooldown_hours: 24
+      expected_role: guest_or_speaker
+      queries: *dylan_podcast_queries
+
+  youtube_channels:
+    - key: semianalysis-youtube-channel
+      name: SemiAnalysis 官方 YouTube
+      channel_id: UCf_KhBXw5TIV0A7butjgFhg
+      locator: https://www.youtube.com/feeds/videos.xml?channel_id=UCf_KhBXw5TIV0A7butjgFhg
+      priority: 108
+      enabled: true
+      fetch_cooldown_hours: 24
+      expected_role: guest_or_speaker
+      generation: 2
+      queries:
+        - Dylan Patel
+
+sources:
+  # P0 transcript-first archive sources. Episode facts and media occurrences
+  # live in config/pipeline/spoken_sources.yaml; this shared registry controls
+  # whether the source is visible to Backend and allowed to run.
+  - key: lex-official-transcripts
+    name: Lex Fridman 官方逐字稿
+    kind: official_transcript_pages
+    enabled: true
+    priority: 120
+    locator: https://lexfridman.com/podcast/
+    discovery_mode: archive_backfill
+    expected_role: guest_or_speaker
+
+  - key: dwarkesh-official-transcripts
+    name: Dwarkesh 官方逐字稿
+    kind: official_transcript_pages
+    enabled: true
+    priority: 120
+    locator: https://www.dwarkesh.com/
+    discovery_mode: archive_backfill
+    expected_role: guest_or_speaker
+
+  - key: sequoia-official-transcripts
+    name: Sequoia 官方逐字稿
+    kind: official_transcript_pages
+    enabled: true
+    priority: 120
+    locator: https://sequoiacap.com/podcast/
+    discovery_mode: archive_backfill
+    expected_role: guest_or_speaker
+
+  - key: latent-space-official-transcripts
+    name: Latent Space 官方逐字稿
+    kind: official_transcript_pages
+    enabled: true
+    priority: 120
+    locator: https://www.latent.space/
+    discovery_mode: archive_backfill
+    expected_role: guest_or_speaker
+
+  - key: chinatalk-official-transcripts
+    name: ChinaTalk 官方逐字稿
+    kind: official_transcript_pages
+    enabled: true
+    priority: 120
+    locator: https://www.chinatalk.media/
+    discovery_mode: archive_backfill
+    expected_role: guest_or_speaker
+
+  - key: inside-view-official-transcript
+    name: The Inside View 官方逐字稿
+    kind: official_transcript_pages
+    enabled: true
+    priority: 120
+    locator: https://theinsideview.ai/dylan
+    discovery_mode: archive_backfill
+    expected_role: guest_or_speaker
+
+  - key: semianalysis-dylan-profile
+    name: SemiAnalysis Dylan 作者页
+    kind: official_profile
+    enabled: true
+    priority: 100
+    locator: https://semianalysis.com/dylan-patel/
+    fetch_cooldown_hours: 24
+    discovery_mode: linked_content
+    expected_role: author_or_speaker
+
+  - key: semianalysis-site-search
+    name: SemiAnalysis 官网增量发现
+    kind: website_search
+    enabled: false
+    priority: 90
+    locator: https://semianalysis.com/
+    fetch_cooldown_hours: 24
+    discovery_mode: query
+    queries:
+      - '"Dylan Patel"'
+    expected_role: author_or_speaker
+    waiting_reason: 与作者页、WordPress 归档和 Substack 重叠；实网 canary 无独立增量，默认关闭以降低重复请求
+
+  - key: semianalysis-wordpress-archive
+    name: SemiAnalysis 旧站历史归档
+    kind: wordpress_archive
+    enabled: true
+    priority: 116
+    locator: https://semianalysis.com/wp-json/wp/v2/posts
+    api_locator: https://semianalysis.com/wp-json/wp/v2/posts
+    sitemap_locator: https://semianalysis.com/wp-sitemap-posts-post-1.xml
+    discovery_mode: archive_backfill
+    run_mode: archive_backfill
+    scope_key: semianalysis-wordpress-posts
+    generation: 1
+    fetch_cooldown_hours: 0
+    max_requests_per_run: 20
+    max_results_per_query: 18
+    expected_role: author_or_speaker
+
+  - key: semianalysis-substack-rss
+    name: SemiAnalysis Substack 增量 RSS
+    kind: substack_rss
+    enabled: true
+    priority: 118
+    locator: https://newsletter.semianalysis.com/feed
+    discovery_mode: daily_incremental
+    run_mode: daily_incremental
+    scope_key: semianalysis-substack-recent
+    fetch_cooldown_hours: 24
+    expected_role: author_or_speaker
+
+  - key: semianalysis-substack-archive
+    name: SemiAnalysis Substack 历史归档
+    kind: substack_archive
+    enabled: true
+    priority: 114
+    locator: https://newsletter.semianalysis.com/api/v1/archive
+    archive_locator: https://newsletter.semianalysis.com/api/v1/archive
+    discovery_mode: archive_backfill
+    run_mode: archive_backfill
+    scope_key: semianalysis-substack-archive
+    # Generation 1 stopped at the publication's irregular 23-item first page.
+    # Generation 2 uses empty-page completion and preserves the old cursor as audit history.
+    generation: 2
+    fetch_cooldown_hours: 0
+    max_requests_per_run: 2
+    max_results_per_query: 50
+    expected_role: author_or_speaker
+
+  - key: itunes-dylan-podcast-search
+    name: Apple Podcasts Dylan 做客发现
+    kind: itunes_podcast_search
+    enabled: true
+    priority: 82
+    locator: https://itunes.apple.com/search
+    api_locator: https://itunes.apple.com/search
+    discovery_mode: query_search
+    run_mode: query_search
+    scope_key: apple-dylan-podcast-search
+    fetch_cooldown_hours: 168
+    max_requests_per_run: 3
+    max_results_per_query: 50
+    queries:
+      - Dylan Patel SemiAnalysis
+      - Dylan Patel AI chips
+      - Dylan Patel semiconductor
+    identity_anchor_terms:
+      - SemiAnalysis
+      - semiconductor
+      - semiconductors
+      - AI infrastructure
+      - NVIDIA
+      - GPU
+      - chips
+    exclude_identity_terms:
+      - social media marketing
+      - digital marketing
+      - community medicine
+      - retail operations
+    expected_role: guest_or_speaker
+
+  - key: semianalysis-events
+    name: SemiAnalysis 官方活动与录播发现
+    kind: events_page
+    enabled: true
+    priority: 80
+    locator: https://semianalysis.com/semianalysis-events/
+    discovery_mode: query_search
+    run_mode: query_search
+    scope_key: semianalysis-events
+    fetch_cooldown_hours: 168
+    queries:
+      - Dylan Patel
+    expected_role: guest_or_speaker
+
+  - key: dylan-x-timeline
+    name: Dylan Patel 个人 X
+    kind: x_user_timeline
+    enabled: false
+    priority: 120
+    locator: https://api.x.com/2
+    api_locator: https://api.x.com/2/users/{user_id}/tweets
+    username: dylan522p
+    api_token_env: WHS_X_BEARER_TOKEN
+    x_access_mode: twscrape
+    x_accounts_db_env: WHS_X_ACCOUNTS_DB
+    x_include_replies: true
+    x_bootstrap_start_at: "2026-07-03T00:00:00Z"
+    x_request_timeout_seconds: 30
+    monthly_read_limit:
+    max_requests_per_run: 2
+    max_results_per_query: 50
+    fetch_cooldown_hours: 6
+    discovery_mode: daily_incremental
+    run_mode: daily_incremental
+    scope_key: dylan-x-timeline
+    expected_role: author_or_speaker
+    waiting_reason: twscrape 已接通，等待一次专用 X 登录 Cookie 验证后启用
+
+  - key: youtube-cross-channel-search
+    name: YouTube 跨频道做客发现
+    kind: youtube_search
+    enabled: false
+    priority: 80
+    locator: https://www.googleapis.com/youtube/v3/search
+    api_locator: https://www.googleapis.com/youtube/v3/search
+    api_token_env: WHS_YOUTUBE_API_KEY
+    daily_search_request_limit: 6
+    max_requests_per_run: 6
+    max_results_per_query: 25
+    max_pages_per_query: 2
+    fetch_cooldown_hours: 168
+    discovery_mode: query_search
+    run_mode: query_search
+    scope_key: youtube-cross-channel-search
+    generation: 1
+    queries:
+      - '"Dylan Patel" SemiAnalysis'
+      - '"Dylan Patel" interview'
+      - '"Dylan Patel" podcast'
+    identity_anchor_terms:
+      - SemiAnalysis
+      - Semi Analysis
+      - semianalysis.com
+      - newsletter.semianalysis.com
+    exclude_identity_terms:
+      - social media marketing
+      - digital marketing
+      - community medicine
+      - health podcast
+      - retail operations
+    expected_role: guest_or_speaker
+    waiting_reason: 等待 YouTube Data API Key；启用后每周最多 6 次精确搜索请求
+
+  - key: podcast-directory-search
+    name: 旧版 Podcast 目录发现（已由 Apple Search 取代）
+    kind: podcast_search
+    enabled: false
+    priority: 80
+    discovery_mode: query
+    queries:
+      - '"Dylan Patel"'
+      - '"Dylan Patel" SemiAnalysis'
+    expected_role: guest_or_speaker
+
+deferred_sources:
+  - x
+  - facebook
+  - broad_news_monitoring
+
+manual_fallback:
+  enabled: true
+  visible_location: settings.advanced
+  run_full_identity_and_deduplication: true

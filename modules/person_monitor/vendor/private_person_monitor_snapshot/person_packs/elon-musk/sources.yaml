@@ -1,0 +1,124 @@
+schema_version: 0.1.0
+person_slug: elon-musk
+
+defaults:
+  schedule: daily
+  lookback_overlap_hours: 48
+  manual_url_is_primary: false
+  manual_url_mode: advanced_fallback
+
+fixed_feeds:
+  podcast_rss:
+    - key: elon-lex-fridman-podcast-rss
+      name: Lex Fridman Podcast 官方 RSS
+      locator: https://lexfridman.com/feed/podcast/
+      priority: 112
+      enabled: true
+      fetch_cooldown_hours: 24
+      expected_role: guest_or_speaker
+      queries:
+        - Elon Musk
+
+sources:
+  - key: elon-x-personal
+    name: Elon Musk 个人 X
+    kind: x_user_timeline
+    enabled: false
+    priority: 125
+    locator: https://x.com/elonmusk
+    username: elonmusk
+    user_id: "44196397"
+    x_access_mode: official_api
+    api_token_env: PRIVATE_MONITOR_X_BEARER_TOKEN
+    monthly_read_limit: 1000
+    fetch_cooldown_hours: 6
+    expected_role: direct_personal_expression
+    notes: 凭据完成最小 canary 前保持关闭；只接受 user_id 一致的顶层帖子。
+
+  - key: elon-tesla-official-profile
+    name: Tesla IR Elon 官方人物页
+    kind: official_profile
+    enabled: true
+    priority: 120
+    locator: https://ir.tesla.com/corporate/elon-musk
+    fetch_cooldown_hours: 168
+    expected_role: official_identity_reference
+
+  - key: elon-tesla-ir-events
+    name: Tesla 投资者活动与财报问答
+    kind: events_page
+    enabled: true
+    priority: 118
+    locator: https://ir.tesla.com/
+    fetch_cooldown_hours: 24
+    expected_role: company_event_with_possible_direct_speech
+    queries:
+      - Elon Musk
+      - Webcast with Q&A
+      - Investor Day
+      - AI Day
+    notes: 公司材料与 Elon 原话分层，只有明确 speaker 和定位的片段可进入个人 Evidence。
+
+  - key: elon-spacex-official-profile
+    name: SpaceX Elon 官方人物页
+    kind: official_profile
+    enabled: true
+    priority: 118
+    locator: https://www.spacex.com/leadership/elon-musk
+    fetch_cooldown_hours: 168
+    expected_role: official_identity_reference
+
+  - key: elon-xai-site
+    name: xAI 官网
+    kind: website_search
+    enabled: true
+    priority: 108
+    locator: https://x.ai/
+    fetch_cooldown_hours: 24
+    expected_role: institutional_expression_or_event_discovery
+    queries:
+      - Elon Musk
+  - key: elon-podcast-directory-search
+    name: Apple Podcasts / iTunes 做客发现
+    kind: itunes_podcast_search
+    enabled: true
+    priority: 106
+    locator: https://itunes.apple.com/search
+    run_mode: query_search
+    scope_key: elon-musk-guest-search
+    max_requests_per_run: 2
+    max_results_per_query: 25
+    fetch_cooldown_hours: 24
+    expected_role: discovery_only_until_speaker_verified
+    queries:
+      - Elon Musk
+
+  - key: elon-youtube-search
+    name: YouTube 跨频道访谈发现
+    kind: youtube_search
+    enabled: false
+    priority: 104
+    locator: https://www.googleapis.com/youtube/v3/search
+    api_token_env: PRIVATE_MONITOR_YOUTUBE_API_KEY
+    run_mode: query_search
+    scope_key: elon-musk-video-search
+    daily_search_request_limit: 3
+    max_pages_per_query: 1
+    max_results_per_query: 25
+    fetch_cooldown_hours: 24
+    expected_role: discovery_only_until_speaker_verified
+    queries:
+      - '"Elon Musk" interview'
+      - '"Elon Musk" podcast'
+      - '"Elon Musk" keynote'
+
+  - key: elon-lex-official-transcripts
+    name: Lex Fridman 官方逐字稿
+    kind: official_transcript_pages
+    enabled: true
+    priority: 120
+    locator: https://lexfridman.com/podcast/
+    discovery_mode: archive_backfill
+    expected_role: guest_or_speaker
+    queries:
+      - Elon Musk

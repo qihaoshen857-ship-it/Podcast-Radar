@@ -1,0 +1,17 @@
+schema_version: 1.0.0
+slug: elon-musk
+display_name_zh: 埃隆·马斯克 / Elon Musk
+enabled: true
+mode: evidence_first
+source_roles:
+  personal_expression:
+    - elon-musk
+  institutional_expression:
+    - tesla
+    - spacex
+    - xai
+    - x-corp
+    - neuralink
+    - boring-company
+  third_party_reporting:
+    - external-mentions

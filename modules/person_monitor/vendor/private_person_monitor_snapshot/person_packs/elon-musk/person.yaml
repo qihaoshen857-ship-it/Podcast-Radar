@@ -1,0 +1,41 @@
+schema_version: 0.1.0
+person:
+  slug: elon-musk
+  canonical_name: Elon Musk
+  organization: Tesla / SpaceX / xAI / X / Neuralink / The Boring Company
+  roles:
+    - chief_executive_officer
+    - founder
+    - technoking
+    - product_and_engineering_leader
+  aliases:
+    strong:
+      - Elon Musk
+      - Elon Reeve Musk
+      - "@elonmusk"
+    organization:
+      - Tesla
+      - SpaceX
+      - xAI
+      - X Corp
+      - Neuralink
+      - The Boring Company
+    rejected_or_ambiguous:
+      - Elon
+      - Musk
+  official_profiles:
+    - https://x.com/elonmusk
+    - https://ir.tesla.com/corporate/elon-musk
+    - https://www.spacex.com/leadership/elon-musk
+  core_languages:
+    - en
+  output_language: zh-CN
+
+identity_policy:
+  direct_expression_required_for_core_library: true
+  institutional_accounts_are_not_personal_expression: true
+  third_party_mentions_are_related_reporting: true
+  title_only_match_requires_review: true
+  quoted_or_reposted_text_requires_author_check: true
+  low_confidence_action: needs_review
+  never_infer_identity_from_opinion_style: true

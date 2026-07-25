@@ -1,0 +1,317 @@
+{
+  "schema_version": "1.1.0",
+  "people": [
+    {
+      "slug": "dylan-patel",
+      "canonical_name": "Dylan Patel",
+      "display_name_zh": "Dylan Patel / SemiAnalysis",
+      "organization": "SemiAnalysis",
+      "identity_aliases": ["Dylan Patel"],
+      "topics": ["AI 基础设施", "GPU", "HBM", "先进封装", "数据中心资本开支"],
+      "feeds": [
+        {
+          "key": "dwarkesh-podcast-rss",
+          "name": "Dwarkesh Podcast 官方 RSS",
+          "kind": "podcast_rss",
+          "locator": "https://apple.dwarkesh-podcast.workers.dev/feed.rss",
+          "expected_role": "guest_or_speaker",
+          "query_aliases": ["Dylan Patel"]
+        },
+        {
+          "key": "training-data-podcast-rss",
+          "name": "Training Data 官方 RSS",
+          "kind": "podcast_rss",
+          "locator": "https://feeds.megaphone.fm/trainingdata",
+          "expected_role": "guest_or_speaker",
+          "identity_gate": "title_contains_alias",
+          "query_aliases": ["Dylan Patel"]
+        },
+        {
+          "key": "invest-like-best-podcast-rss",
+          "name": "Invest Like the Best 官方 RSS",
+          "kind": "podcast_rss",
+          "locator": "https://feeds.megaphone.fm/CLS2859450455",
+          "expected_role": "guest_or_speaker",
+          "identity_gate": "title_contains_alias",
+          "query_aliases": ["Dylan Patel"]
+        },
+        {
+          "key": "semianalysis-weekly-podcast-rss",
+          "name": "SemiAnalysis Weekly 官方 RSS",
+          "kind": "podcast_rss",
+          "locator": "https://anchor.fm/s/10fbee758/podcast/rss",
+          "expected_role": "guest_or_speaker",
+          "identity_gate": "title_contains_alias",
+          "query_aliases": ["Dylan Patel"]
+        },
+        {
+          "key": "mad-podcast-rss",
+          "name": "The MAD Podcast 官方 RSS",
+          "kind": "podcast_rss",
+          "locator": "https://anchor.fm/s/f2ee4948/podcast/rss",
+          "expected_role": "guest_or_speaker",
+          "identity_gate": "title_contains_alias",
+          "query_aliases": ["Dylan Patel"]
+        },
+        {
+          "key": "tbpn-podcast-rss",
+          "name": "TBPN 官方 RSS",
+          "kind": "podcast_rss",
+          "locator": "https://feeds.transistor.fm/technology-brother",
+          "expected_role": "guest_or_speaker",
+          "identity_gate": "title_contains_alias",
+          "query_aliases": ["Dylan Patel"]
+        },
+        {
+          "key": "wisdomtree-next-big-podcast-rss",
+          "name": "The Next Big Thing 官方 RSS",
+          "kind": "podcast_rss",
+          "locator": "https://anchor.fm/s/e244f894/podcast/rss",
+          "expected_role": "guest_or_speaker",
+          "identity_gate": "title_contains_alias",
+          "query_aliases": ["Dylan Patel"]
+        },
+        {
+          "key": "a16z-podcast-rss",
+          "name": "a16z Podcast 官方 RSS",
+          "kind": "podcast_rss",
+          "locator": "https://feeds.simplecast.com/JGE3yC0V",
+          "expected_role": "guest_or_speaker",
+          "identity_gate": "title_contains_alias",
+          "query_aliases": ["Dylan Patel"]
+        },
+        {
+          "key": "no-priors-podcast-rss",
+          "name": "No Priors 官方 RSS",
+          "kind": "podcast_rss",
+          "locator": "https://feeds.megaphone.fm/nopriors",
+          "expected_role": "guest_or_speaker",
+          "identity_gate": "title_contains_alias",
+          "query_aliases": ["Dylan Patel"]
+        },
+        {
+          "key": "origins-podcast-rss",
+          "name": "ORIGINS 官方 RSS",
+          "kind": "podcast_rss",
+          "locator": "https://api.substack.com/feed/podcast/5820936.rss",
+          "expected_role": "guest_or_speaker",
+          "identity_gate": "title_contains_alias",
+          "query_aliases": ["Dylan Patel"]
+        },
+        {
+          "key": "big-technology-podcast-rss",
+          "name": "Big Technology Podcast 官方 RSS",
+          "kind": "podcast_rss",
+          "locator": "https://feeds.megaphone.fm/LI3617121267",
+          "expected_role": "guest_or_speaker",
+          "identity_gate": "title_contains_alias",
+          "query_aliases": ["Dylan Patel"]
+        },
+        {
+          "key": "unsupervised-learning-podcast-rss",
+          "name": "Unsupervised Learning 官方 RSS",
+          "kind": "podcast_rss",
+          "locator": "https://feeds.simplecast.com/dOSE_bdP",
+          "expected_role": "guest_or_speaker",
+          "identity_gate": "title_contains_alias",
+          "query_aliases": ["Dylan Patel"]
+        },
+        {
+          "key": "bg2-podcast-rss",
+          "name": "BG2Pod 官方 RSS",
+          "kind": "podcast_rss",
+          "locator": "https://anchor.fm/s/f06c2370/podcast/rss",
+          "expected_role": "guest_or_speaker",
+          "identity_gate": "title_contains_alias",
+          "query_aliases": ["Dylan Patel"]
+        },
+        {
+          "key": "exponential-view-podcast-rss",
+          "name": "Exponential View 官方 RSS",
+          "kind": "podcast_rss",
+          "locator": "https://feeds.simplecast.com/e_GRxR9a",
+          "expected_role": "guest_or_speaker",
+          "identity_gate": "title_contains_alias",
+          "query_aliases": ["Dylan Patel"]
+        },
+        {
+          "key": "hidden-forces-podcast-rss",
+          "name": "Hidden Forces 官方 RSS",
+          "kind": "podcast_rss",
+          "locator": "https://hiddenforces.libsyn.com/rss",
+          "expected_role": "guest_or_speaker",
+          "identity_gate": "title_contains_alias",
+          "query_aliases": ["Dylan Patel"]
+        }
+      ],
+      "searches": [
+        {
+          "key": "itunes-dylan-podcast-search",
+          "name": "Apple Podcasts Dylan 做客发现",
+          "kind": "itunes_episode_search",
+          "locator": "https://itunes.apple.com/search",
+          "expected_role": "guest_or_speaker",
+          "identity_gate": "title_contains_alias",
+          "queries": ["Dylan Patel"],
+          "result_limit": 200,
+          "blocked_collections": [
+            "digital marketing",
+            "community medicine",
+            "social media marketing"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "elon-musk",
+      "canonical_name": "Elon Musk",
+      "display_name_zh": "埃隆·马斯克 / Elon Musk",
+      "organization": "Tesla / SpaceX / xAI / X / Neuralink",
+      "identity_aliases": ["Elon Musk"],
+      "topics": ["人工智能与 xAI", "自动驾驶", "机器人", "航天", "能源与储能"],
+      "feeds": [
+        {
+          "key": "elon-lex-fridman-podcast-rss",
+          "name": "Lex Fridman Podcast 官方 RSS",
+          "kind": "podcast_rss",
+          "locator": "https://lexfridman.com/feed/podcast/",
+          "expected_role": "guest_or_speaker",
+          "query_aliases": ["Elon Musk"]
+        },
+        {
+          "key": "elon-jre-podcast-rss",
+          "name": "The Joe Rogan Experience 官方 RSS",
+          "kind": "podcast_rss",
+          "locator": "https://feeds.megaphone.fm/GLT1412515089",
+          "expected_role": "guest_or_speaker",
+          "query_aliases": ["Elon Musk"]
+        },
+        {
+          "key": "elon-dwarkesh-podcast-rss",
+          "name": "Dwarkesh Podcast 官方 RSS",
+          "kind": "podcast_rss",
+          "locator": "https://apple.dwarkesh-podcast.workers.dev/feed.rss",
+          "expected_role": "guest_or_speaker",
+          "query_aliases": ["Elon Musk"]
+        },
+        {
+          "key": "elon-all-in-podcast-rss",
+          "name": "All-In Podcast 官方 RSS",
+          "kind": "podcast_rss",
+          "locator": "https://rss.libsyn.com/shows/254861/destinations/1928300.xml",
+          "expected_role": "guest_or_speaker",
+          "identity_gate": "title_contains_alias",
+          "required_title_terms": [
+            "elon musk on",
+            "elon musk:",
+            "elon musk |",
+            "- elon musk",
+            "– elon musk",
+            "— elon musk"
+          ],
+          "query_aliases": ["Elon Musk"]
+        },
+        {
+          "key": "elon-people-by-wtf-rss",
+          "name": "People by WTF 官方 RSS",
+          "kind": "podcast_rss",
+          "locator": "https://feeds.hubhopper.com/db41907e6c28518ffe336b392c715ef1.rss",
+          "expected_role": "guest_or_speaker",
+          "excluded_title_terms": ["trailer"],
+          "query_aliases": ["Elon Musk"]
+        },
+        {
+          "key": "elon-babylon-bee-rss",
+          "name": "The Babylon Bee 官方 RSS",
+          "kind": "podcast_rss",
+          "locator": "https://rss.libsyn.com/shows/186422/destinations/1283171.xml",
+          "expected_role": "guest_or_speaker",
+          "identity_gate": "title_contains_alias",
+          "required_title_terms": ["interview", "talks with"],
+          "query_aliases": ["Elon Musk"]
+        },
+        {
+          "key": "elon-ted-talks-daily-rss",
+          "name": "TED Talks Daily 官方 RSS",
+          "kind": "podcast_rss",
+          "locator": "https://feeds.acast.com/public/shows/67587e77c705e441797aff96",
+          "expected_role": "guest_or_speaker",
+          "identity_gate": "title_contains_alias",
+          "required_title_terms": ["| elon musk"],
+          "query_aliases": ["Elon Musk"]
+        },
+        {
+          "key": "elon-ted-interview-rss",
+          "name": "The TED Interview 官方 RSS",
+          "kind": "podcast_rss",
+          "locator": "https://feeds.acast.com/public/shows/67045b43aa9d704b1e952e88",
+          "expected_role": "guest_or_speaker",
+          "identity_gate": "title_contains_alias",
+          "required_title_terms": ["what's on", "what’s on"],
+          "query_aliases": ["Elon Musk"]
+        },
+        {
+          "key": "elon-moonshots-rss",
+          "name": "Moonshots with Peter Diamandis 官方 RSS",
+          "kind": "podcast_rss",
+          "locator": "https://feeds.megaphone.fm/DVVTS2890392624",
+          "expected_role": "guest_or_speaker",
+          "excluded_title_terms": ["elon musk vs.", "elon musk vs "],
+          "query_aliases": ["Elon Musk"]
+        },
+        {
+          "key": "elon-verdict-ted-cruz-rss",
+          "name": "Verdict with Ted Cruz 官方 RSS",
+          "kind": "podcast_rss",
+          "locator": "https://www.omnycontent.com/d/playlist/e73c998e-6e60-432f-8610-ae210140c5b1/2bee9419-43de-46ce-8996-af2a01167517/84cf551f-a33b-41d8-b112-af2a01167541/podcast.rss",
+          "expected_role": "guest_or_speaker",
+          "identity_gate": "title_contains_alias",
+          "required_title_terms": ["complete interview", "elon musk: 1-on-1"],
+          "query_aliases": ["Elon Musk"]
+        }
+      ],
+      "searches": [
+        {
+          "key": "itunes-elon-podcast-search",
+          "name": "Apple Podcasts Elon 做客发现",
+          "kind": "itunes_episode_search",
+          "locator": "https://itunes.apple.com/search",
+          "expected_role": "guest_or_speaker",
+          "identity_gate": "title_contains_alias",
+          "queries": ["Elon Musk"],
+          "result_limit": 200,
+          "trusted_collections": [
+            "Lex Fridman Podcast",
+            "The Joe Rogan Experience",
+            "Dwarkesh Podcast",
+            "Moonshots with Peter Diamandis",
+            "All-In with Chamath, Jason, Sacks & Friedberg",
+            "People by WTF",
+            "The Babylon Bee",
+            "TED Talks Daily",
+            "The TED Interview",
+            "Verdict with Ted Cruz",
+            "Big Take",
+            "The Tim Ferriss Show"
+          ],
+          "required_title_terms": [
+            "interview",
+            "elon musk on",
+            "elon musk:",
+            "- elon musk",
+            "– elon musk",
+            "— elon musk",
+            "elon musk |",
+            "what's on elon musk",
+            "what’s on elon musk"
+          ],
+          "blocked_collections": [
+            "Elon Musk Thinking",
+            "Elon Musk Podcast",
+            "AI Update"
+          ]
+        }
+      ]
+    }
+  ]
+}

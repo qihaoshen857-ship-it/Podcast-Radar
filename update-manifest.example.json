@@ -1,0 +1,13 @@
+{
+  "app_name": "Podcast Radar",
+  "platform": "macos",
+  "current_version": "0.4.0",
+  "release_date": "2026-06-22",
+  "download_url": "https://你的下载链接/PodcastRadar-0.4.0-macos.zip",
+  "release_notes": [
+    "新增应用打包分发能力",
+    "增加稳定的同事内测安装包路径"
+  ],
+  "min_required_version": "0.4.0",
+  "signature": ""
+}

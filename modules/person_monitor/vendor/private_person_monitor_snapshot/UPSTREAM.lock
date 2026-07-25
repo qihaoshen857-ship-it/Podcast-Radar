@@ -1,0 +1,37 @@
+schema_version: 1
+upstream:
+  name: what-he-said
+  source_path_at_copy_time: local/private-person-monitor
+  commit: 67d31e4e25afbcdfd1d4727b5d04e3118696289b
+  committed_at: 2026-07-19T18:31:59+08:00
+  subject: "feat: add safe X timeline fallback"
+copy:
+  copied_at: 2026-07-20T12:00:00+08:00
+  method: git_archive_committed_tree
+  destination: vendor/what_he_said_snapshot
+  file_count: 82
+  snapshot_digest_sha256: 5d9d6ec210e3e9de2f66f2979534fc6025232049bb28cfd1345dcb3dc1a4297c
+  includes:
+    - AGENTS.md
+    - README.md
+    - pyproject.toml
+    - config/
+    - contracts/
+    - scripts/
+    - src/what_he_said/pipeline/
+  excludes:
+    - .env
+    - data/
+    - frontend/
+    - migrations/
+    - src/what_he_said/backend/
+    - uncommitted_worktree_changes
+trees:
+  pipeline: 1ba74eac13b59bf62b334857088eeb351210710c
+  contracts: 87ff491a582bb90300e8c90f8596437df62ef06b
+  config: 160d0193f2bd55d158eef23e2be72ac600931040
+  scripts: 09a46a70bc967b2283f37af92be0c07f2be386c5
+policy:
+  runtime_import_from_live_upstream: false
+  vendor_snapshot_is_read_only: true
+  automatic_resync: false

@@ -1,0 +1,24 @@
+{
+  "schema_version": "1.0.0",
+  "generated_at": "2026-07-20T12:27:21Z",
+  "producer": {"name": "person-monitor-embedded", "version": "0.1.0"},
+  "person": {
+    "slug": "dylan-patel",
+    "canonical_name": "Dylan Patel",
+    "display_name_zh": "Dylan Patel / SemiAnalysis",
+    "organization": "SemiAnalysis"
+  },
+  "source_status": [
+    {
+      "source_key": "dwarkesh-podcast-rss",
+      "kind": "podcast_rss",
+      "status": "succeeded",
+      "item_count": 0,
+      "related_mentions_filtered": 0,
+      "diagnostics": {"feed_entries": 20}
+    }
+  ],
+  "items": [],
+  "item_count": 0,
+  "seed_snapshot": true
+}

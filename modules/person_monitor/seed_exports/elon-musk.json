@@ -1,0 +1,70 @@
+{
+  "schema_version": "1.0.0",
+  "generated_at": "2026-07-20T12:27:21Z",
+  "producer": {"name": "person-monitor-embedded", "version": "0.1.0"},
+  "person": {
+    "slug": "elon-musk",
+    "canonical_name": "Elon Musk",
+    "display_name_zh": "埃隆·马斯克 / Elon Musk",
+    "organization": "Tesla / SpaceX / xAI / X / Neuralink"
+  },
+  "source_status": [
+    {
+      "source_key": "elon-lex-fridman-podcast-rss",
+      "kind": "podcast_rss",
+      "status": "succeeded",
+      "item_count": 3,
+      "related_mentions_filtered": 47,
+      "diagnostics": {"feed_entries": 499}
+    }
+  ],
+  "items": [
+    {
+      "schema_version": "0.3.0",
+      "candidate_key": "elon-lex-fridman-podcast-rss:29e534cef818728c40bb797e",
+      "source_key": "elon-lex-fridman-podcast-rss",
+      "provider_item_id": "https://lexfridman.com/?p=5968",
+      "url": "https://lexfridman.com/elon-musk-and-neuralink-team/",
+      "title": "#438 – Elon Musk: Neuralink and the Future of Humanity",
+      "author_or_channel": "Lex Fridman Podcast",
+      "published_at": "2024-08-02T19:19:20Z",
+      "monitoring_classification": {
+        "status": "direct_expression_candidate",
+        "identity_match_basis": "title_strong_alias",
+        "speaker_or_author_confirmation_required": true
+      }
+    },
+    {
+      "schema_version": "0.3.0",
+      "candidate_key": "elon-lex-fridman-podcast-rss:3c212eb111615ed110974808",
+      "source_key": "elon-lex-fridman-podcast-rss",
+      "provider_item_id": "https://lexfridman.com/?p=5674",
+      "url": "https://lexfridman.com/elon-musk-4/",
+      "title": "#400 – Elon Musk: War, AI, Aliens, Politics, Physics, Video Games, and Humanity",
+      "author_or_channel": "Lex Fridman Podcast",
+      "published_at": "2023-11-09T19:03:46Z",
+      "monitoring_classification": {
+        "status": "direct_expression_candidate",
+        "identity_match_basis": "title_strong_alias",
+        "speaker_or_author_confirmation_required": true
+      }
+    },
+    {
+      "schema_version": "0.3.0",
+      "candidate_key": "elon-lex-fridman-podcast-rss:e00295587f84d1ff9ae28185",
+      "source_key": "elon-lex-fridman-podcast-rss",
+      "provider_item_id": "https://lexfridman.com/?p=4880",
+      "url": "https://lexfridman.com/elon-musk-3/",
+      "title": "#252 – Elon Musk: SpaceX, Mars, Tesla Autopilot, Self-Driving, Robotics, and AI",
+      "author_or_channel": "Lex Fridman Podcast",
+      "published_at": "2021-12-28T19:02:28Z",
+      "monitoring_classification": {
+        "status": "direct_expression_candidate",
+        "identity_match_basis": "title_strong_alias",
+        "speaker_or_author_confirmation_required": true
+      }
+    }
+  ],
+  "item_count": 3,
+  "seed_snapshot": true
+}
