@@ -64,7 +64,7 @@ from app.transcription import (
 
 
 APP_NAME = "Podcast Radar"
-APP_VERSION = "0.4.29"
+APP_VERSION = "0.4.36"
 TRANSCRIPTION_MODE_OPTIONS = {
     "本地优先": "local_first",
     "极速云端": "cloud_fast",
@@ -427,6 +427,207 @@ WEATHER_AGRI_REJECT_KEYWORDS = (
     "outdoor adventures",
     "deer",
 )
+AI_STARTUP_AI_KEYWORDS = (
+    "ai",
+    "artificial intelligence",
+    "generative ai",
+    "llm",
+    "large language model",
+    "agent",
+    "agentic",
+    "chatgpt",
+    "claude",
+    "codex",
+    "cursor",
+    "openai",
+    "anthropic",
+    "gemini",
+    "grok",
+    "copilot",
+    "machine learning",
+    "automation",
+    "vibe coding",
+    "mcp",
+    "人工智能",
+    "生成式 ai",
+    "大模型",
+    "智能体",
+    "ai 工具",
+    "ai工具",
+    "数字员工",
+)
+AI_STARTUP_STORY_KEYWORDS = (
+    "founder",
+    "co-founder",
+    "cofounder",
+    "entrepreneur",
+    "startup",
+    "build",
+    "built",
+    "launch",
+    "product-market fit",
+    "pmf",
+    "bootstrapped",
+    "bootstrap",
+    "solo business",
+    "solo founder",
+    "indie hacker",
+    "from zero",
+    "0 to 1",
+    "go-to-market",
+    "gtm",
+    "revenue",
+    "arr",
+    "mrr",
+    "customer",
+    "pricing",
+    "sales",
+    "marketing",
+    "agency",
+    "business",
+    "company",
+    "ceo",
+    "cpo",
+    "cto",
+    "how i use",
+    "workflow",
+    "monetize",
+    "创始人",
+    "创业者",
+    "创业",
+    "从 0 到 1",
+    "从0到1",
+    "一人公司",
+    "产品",
+    "商业化",
+    "获客",
+    "收入",
+    "营收",
+    "客户",
+    "定价",
+    "出海",
+    "融资",
+    "增长",
+    "落地",
+)
+AI_STARTUP_STRONG_STORY_KEYWORDS = (
+    "founder",
+    "co-founder",
+    "cofounder",
+    "entrepreneur",
+    "startup",
+    "bootstrapped",
+    "solo founder",
+    "indie hacker",
+    "product-market fit",
+    "0 to 1",
+    "创始人",
+    "创业者",
+    "创业",
+    "从 0 到 1",
+    "从0到1",
+    "一人公司",
+)
+AI_STARTUP_TITLE_EXECUTION_KEYWORDS = (
+    "founder",
+    "co-founder",
+    "cofounder",
+    "entrepreneur",
+    "startup",
+    "build",
+    "built",
+    "launch",
+    "product-market fit",
+    "pmf",
+    "bootstrapped",
+    "solo business",
+    "solo founder",
+    "indie hacker",
+    "0 to 1",
+    "go-to-market",
+    "gtm",
+    "revenue",
+    "arr",
+    "mrr",
+    "customer",
+    "pricing",
+    "sales",
+    "marketing",
+    "agency",
+    "how i use",
+    "workflow",
+    "monetize",
+    "创始人",
+    "创业者",
+    "创业",
+    "从 0 到 1",
+    "从0到1",
+    "一人公司",
+    "商业化",
+    "获客",
+    "收入",
+    "营收",
+    "客户",
+    "定价",
+    "出海",
+)
+AI_STARTUP_NEWS_KEYWORDS = (
+    "daily brief",
+    "news roundup",
+    "weekly news",
+    "market update",
+    "latest ai news",
+    "model release",
+    "benchmark",
+    "earnings",
+    "overvalued",
+    "ban chinese",
+    "geopolitics",
+    "chip war",
+    "industry update",
+    "explained",
+    "bigger deal",
+    "release matters",
+    "first ever round",
+    "margins matter",
+    "will open source threaten",
+    "series a is hard",
+    "fool or genius",
+    "sounds the alarm",
+    "who wins the ai war",
+    "china vs america",
+    "offers trump",
+    "who wins",
+    "open models vs",
+    "model war",
+    "frontier models",
+    "electricity",
+    "energy sovereignty",
+    "ai capex",
+    "export controls",
+    "ai infrastructure",
+    "demand for compute",
+    "token spend",
+    "hiring ai researchers",
+    "model is the product",
+    "power is the bottleneck",
+    "新闻速递",
+    "一周新闻",
+    "行业周报",
+    "模型测评",
+    "发布会",
+    "产业新闻",
+    "政策解读",
+    "大厂财报",
+    "估值争论",
+    "芯片禁令",
+)
+AI_STARTUP_NATIVE_STORY_FEED_NAMES = {
+    "The Startup Ideas Podcast",
+    "The AI Ventures Podcast",
+    "Pitch, Build, Scale",
+    "小宇宙 | 十字路口 Crossing",
+}
 AI_PODCAST_SEARCHES: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("Latent Space", "Latent Space AI Engineer", ("latent", "space")),
     ("No Priors", "No Priors Artificial Intelligence", ("no", "priors")),
@@ -627,6 +828,45 @@ DEFAULT_AI_PODCAST_FEEDS: tuple[PodcastFeed, ...] = (
     PodcastFeed("Hard Fork", "https://feeds.simplecast.com/6HKOhNgS", "The New York Times", 7),
 )
 
+DEFAULT_AI_STARTUP_PODCAST_FEEDS: tuple[PodcastFeed, ...] = (
+    PodcastFeed(
+        "The Startup Ideas Podcast",
+        "https://rss2.flightcast.com/ordbkg8yojpehffas7vr7qpc.xml",
+        "Greg Isenberg",
+        0,
+    ),
+    PodcastFeed(
+        "Y Combinator Startup Podcast",
+        "https://anchor.fm/s/8c1524bc/podcast/rss",
+        "Y Combinator",
+        1,
+    ),
+    PodcastFeed(
+        "A Product Market Fit Show | Startup Podcast for Founders",
+        "https://rss.buzzsprout.com/1889238.rss",
+        "Mistral.vc",
+        2,
+    ),
+    PodcastFeed(
+        "The SaaS Podcast - Real Lessons on Growing Profitable SaaS",
+        "https://feeds.megaphone.fm/AHARO1075645324",
+        "Omer Khan",
+        3,
+    ),
+    PodcastFeed(
+        "Pitch, Build, Scale",
+        "https://anchor.fm/s/102d93688/podcast/rss",
+        "Chris Fanchi",
+        4,
+    ),
+    PodcastFeed(
+        "The AI Ventures Podcast",
+        "https://rss.buzzsprout.com/2613681.rss",
+        "Adam Knees",
+        5,
+    ),
+)
+
 DEFAULT_WEATHER_AGRI_PODCAST_FEEDS: tuple[PodcastFeed, ...] = (
     PodcastFeed("WeatherBrains", "https://weatherbrains.libsyn.com/rss", "Big Brains Media", 0),
     PodcastFeed("Weather Geeks", "https://rss.art19.com/weather-geeks", "Weather Group Television", 1),
@@ -677,6 +917,16 @@ DEFAULT_AI_XIAOYUZHOU_FEEDS: tuple[XiaoyuzhouFeed, ...] = (
     XiaoyuzhouFeed("小宇宙 | AI每周谈", "https://www.xiaoyuzhoufm.com/podcast/688a34636f5a275f1cba40fd", "四维逻辑", 3, "ai"),
 )
 
+DEFAULT_AI_STARTUP_XIAOYUZHOU_FEEDS: tuple[XiaoyuzhouFeed, ...] = (
+    XiaoyuzhouFeed(
+        "小宇宙 | 十字路口 Crossing",
+        "https://www.xiaoyuzhoufm.com/podcast/60502e253c92d4f62c2a9577",
+        "十字路口 Crossing",
+        0,
+        "ai_startup",
+    ),
+)
+
 DEFAULT_SCIENCE_WELLNESS_XIAOYUZHOU_FEEDS: tuple[XiaoyuzhouFeed, ...] = (
     XiaoyuzhouFeed("小宇宙 | 健康有方FM", "https://www.xiaoyuzhoufm.com/podcast/670e3d971985fe85db1fd06b", "澎湃新闻健康频道", 0, "science_wellness"),
     XiaoyuzhouFeed("小宇宙 | 漫谈健康", "https://www.xiaoyuzhoufm.com/podcast/68ec5982475ee5285f3dbd0c", "漫谈健康", 1, "science_wellness"),
@@ -685,6 +935,10 @@ DEFAULT_SCIENCE_WELLNESS_XIAOYUZHOU_FEEDS: tuple[XiaoyuzhouFeed, ...] = (
 
 WEATHER_AGRI_FEED_NAMES = {feed.name for feed in DEFAULT_WEATHER_AGRI_PODCAST_FEEDS}
 AI_FEED_NAMES = {feed.name for feed in DEFAULT_AI_PODCAST_FEEDS + DEFAULT_AI_YOUTUBE_FEEDS + DEFAULT_AI_XIAOYUZHOU_FEEDS}
+AI_STARTUP_FEED_NAMES = {
+    feed.name
+    for feed in DEFAULT_AI_STARTUP_PODCAST_FEEDS + DEFAULT_AI_STARTUP_XIAOYUZHOU_FEEDS
+}
 SCIENCE_WELLNESS_FEED_NAMES = {
     feed.name
     for feed in DEFAULT_SCIENCE_WELLNESS_PODCAST_FEEDS
@@ -694,43 +948,89 @@ SCIENCE_WELLNESS_FEED_NAMES = {
 
 PODCAST_FEED_GROUPS: dict[str, tuple[PodcastFeed, ...]] = {
     "ai": DEFAULT_AI_PODCAST_FEEDS,
+    "ai_startup": DEFAULT_AI_STARTUP_PODCAST_FEEDS,
     "weather_agri": DEFAULT_WEATHER_AGRI_PODCAST_FEEDS,
     "science_wellness": DEFAULT_SCIENCE_WELLNESS_PODCAST_FEEDS,
-    "all": DEFAULT_AI_PODCAST_FEEDS + DEFAULT_WEATHER_AGRI_PODCAST_FEEDS + DEFAULT_SCIENCE_WELLNESS_PODCAST_FEEDS,
+    "all": (
+        DEFAULT_AI_PODCAST_FEEDS
+        + DEFAULT_AI_STARTUP_PODCAST_FEEDS
+        + DEFAULT_WEATHER_AGRI_PODCAST_FEEDS
+        + DEFAULT_SCIENCE_WELLNESS_PODCAST_FEEDS
+    ),
 }
 YOUTUBE_FEED_GROUPS: dict[str, tuple[YouTubeFeed, ...]] = {
     "ai": DEFAULT_AI_YOUTUBE_FEEDS,
+    "ai_startup": (),
     "weather_agri": (),
     "science_wellness": DEFAULT_SCIENCE_WELLNESS_YOUTUBE_FEEDS,
     "all": DEFAULT_AI_YOUTUBE_FEEDS + DEFAULT_SCIENCE_WELLNESS_YOUTUBE_FEEDS,
 }
 XIAOYUZHOU_FEED_GROUPS: dict[str, tuple[XiaoyuzhouFeed, ...]] = {
     "ai": DEFAULT_AI_XIAOYUZHOU_FEEDS,
+    "ai_startup": DEFAULT_AI_STARTUP_XIAOYUZHOU_FEEDS,
     "weather_agri": (),
     "science_wellness": DEFAULT_SCIENCE_WELLNESS_XIAOYUZHOU_FEEDS,
-    "all": DEFAULT_AI_XIAOYUZHOU_FEEDS + DEFAULT_SCIENCE_WELLNESS_XIAOYUZHOU_FEEDS,
+    "all": (
+        DEFAULT_AI_XIAOYUZHOU_FEEDS
+        + DEFAULT_AI_STARTUP_XIAOYUZHOU_FEEDS
+        + DEFAULT_SCIENCE_WELLNESS_XIAOYUZHOU_FEEDS
+    ),
 }
 PODCAST_GROUP_LABELS = {
     "ai": "AI 播客",
+    "ai_startup": "AI创业",
     "weather_agri": "天气农业",
     "science_wellness": "科学养生",
     "all": "综合雷达",
 }
+TOPIC_FILTER_LABELS = {
+    "all": "综合",
+    "ai": "AI",
+    "ai_startup": "AI创业",
+    "weather_agri": "天气",
+    "science_wellness": "养生",
+}
+
+
+def topic_filter_variant(button_topic: str, current_topic: str) -> str:
+    """Return the visual variant for a radar topic filter button."""
+    return "accent" if button_topic == current_topic else "secondary"
+
+
+def topic_display_label(topic: str) -> str:
+    if topic == "manual":
+        return "手动链接"
+    if topic == "favorites":
+        return "我的精选"
+    return TOPIC_FILTER_LABELS.get(topic, PODCAST_GROUP_LABELS.get(topic, "播客"))
+
+
+def topic_download_title(topic: str) -> str:
+    if topic == "all":
+        return "今日雷达"
+    if topic == "favorites":
+        return "我的精选"
+    return f"今日雷达 · {topic_display_label(topic)}"
 
 FEED_PRIORITY_BY_NAME = {
     feed.name: feed.priority
     for feed in (
         DEFAULT_AI_PODCAST_FEEDS
+        + DEFAULT_AI_STARTUP_PODCAST_FEEDS
         + DEFAULT_WEATHER_AGRI_PODCAST_FEEDS
         + DEFAULT_SCIENCE_WELLNESS_PODCAST_FEEDS
         + DEFAULT_AI_YOUTUBE_FEEDS
         + DEFAULT_SCIENCE_WELLNESS_YOUTUBE_FEEDS
         + DEFAULT_AI_XIAOYUZHOU_FEEDS
+        + DEFAULT_AI_STARTUP_XIAOYUZHOU_FEEDS
         + DEFAULT_SCIENCE_WELLNESS_XIAOYUZHOU_FEEDS
     )
 }
 
 INVESTMENT_KEYWORDS: tuple[tuple[tuple[str, ...], float, str], ...] = (
+    (("founder", "co-founder", "entrepreneur", "创始人", "创业者"), 1.0, "创始人一手经验"),
+    (("revenue", "arr", "mrr", "pricing", "go-to-market", "商业化", "获客", "营收", "定价"), 1.1, "商业化验证"),
+    (("product-market fit", "pmf", "bootstrapped", "solo founder", "0 to 1", "从0到1", "一人公司"), 0.9, "从 0 到 1"),
     (("nvidia", "gpu", "h100", "h200", "gb200", "blackwell", "accelerator"), 1.3, "AI 算力"),
     (("data center", "datacenter", "capex", "power", "electricity", "grid", "cooling"), 1.2, "数据中心/电力链"),
     (("openai", "anthropic", "claude", "gemini", "deepseek", "qwen", "llama"), 1.0, "核心模型"),
@@ -882,7 +1182,71 @@ def parse_item_date(value: str) -> datetime | None:
     return parsed
 
 
+def text_contains_keyword(text: str, keyword: str) -> bool:
+    normalized_text = html.unescape(text or "").lower().replace("’", "'")
+    normalized_keyword = keyword.lower()
+    if normalized_keyword in {"ai", "llm", "arr", "mrr", "pmf", "mcp", "gtm"}:
+        return bool(
+            re.search(
+                rf"(?<![a-z0-9]){re.escape(normalized_keyword)}(?![a-z0-9])",
+                normalized_text,
+            )
+        )
+    return normalized_keyword in normalized_text
+
+
+def text_matches_any_keyword(text: str, keywords: tuple[str, ...]) -> bool:
+    return any(text_contains_keyword(text, keyword) for keyword in keywords)
+
+
+def strip_negated_ai_phrases(text: str) -> str:
+    cleaned = re.sub(
+        r"\b(?:without|no|not using|does not use|doesn't use)\s+(?:any\s+)?(?:ai|artificial intelligence)(?:\s+tools?)?\b",
+        " ",
+        text or "",
+        flags=re.IGNORECASE,
+    )
+    return re.sub(r"(?:不使用|没有|无)\s*AI(?:\s*工具)?", " ", cleaned, flags=re.IGNORECASE)
+
+
+def is_ai_startup_story_item(title: str, description: str = "", source_name: str = "") -> bool:
+    title_text = strip_html_text(title)
+    description_text = strip_html_text(description)
+    description_focus = description_text[:700]
+    combined_text = f"{title_text} {description_focus}".strip()
+    title_ai_text = strip_negated_ai_phrases(title_text)
+    combined_ai_text = strip_negated_ai_phrases(combined_text)
+
+    title_has_ai = text_matches_any_keyword(title_ai_text, AI_STARTUP_AI_KEYWORDS)
+    description_opening_has_ai = text_matches_any_keyword(
+        strip_negated_ai_phrases(description_focus[:450]),
+        AI_STARTUP_AI_KEYWORDS,
+    )
+    description_has_strong_story = text_matches_any_keyword(
+        description_focus,
+        AI_STARTUP_STRONG_STORY_KEYWORDS,
+    )
+    title_has_strong_story = text_matches_any_keyword(title_text, AI_STARTUP_STRONG_STORY_KEYWORDS)
+    title_has_execution = text_matches_any_keyword(title_text, AI_STARTUP_TITLE_EXECUTION_KEYWORDS)
+    title_looks_like_news = text_matches_any_keyword(title_text, AI_STARTUP_NEWS_KEYWORDS)
+
+    if title_looks_like_news:
+        return False
+    if source_name in AI_STARTUP_NATIVE_STORY_FEED_NAMES:
+        return text_matches_any_keyword(combined_ai_text, AI_STARTUP_AI_KEYWORDS) and text_matches_any_keyword(
+            combined_text,
+            AI_STARTUP_STORY_KEYWORDS,
+        )
+    return (
+        (title_has_ai and title_has_execution)
+        or (title_has_ai and description_has_strong_story)
+        or (title_has_strong_story and description_opening_has_ai)
+    )
+
+
 def infer_item_topic(item: VideoItem) -> str:
+    if item.source_name in AI_STARTUP_FEED_NAMES:
+        return "ai_startup"
     if item.source_name in AI_FEED_NAMES:
         return "ai"
     if item.source_name in WEATHER_AGRI_FEED_NAMES:
@@ -892,6 +1256,8 @@ def infer_item_topic(item: VideoItem) -> str:
     text = f"{item.source_name} {item.title} {item.description_text}".lower()
     if any(keyword in text for keyword in WEATHER_AGRI_TITLE_KEYWORDS):
         return "weather_agri"
+    if is_ai_startup_story_item(item.title, item.description_text, item.source_name):
+        return "ai_startup"
     if any(keyword in text for keyword in ("ai", "llm", "model", "gpu", "openai", "agent", "data center")):
         return "ai"
     if any(keyword in text for keyword in ("health", "nutrition", "sleep", "longevity", "protein", "metabolic")):
@@ -911,6 +1277,7 @@ def investment_value_score(item: VideoItem) -> tuple[float, list[str]]:
     topic = infer_item_topic(item)
     score = {
         "ai": 5.4,
+        "ai_startup": 5.2,
         "weather_agri": 5.8,
         "science_wellness": 3.8,
         "manual": 4.2,
@@ -1240,6 +1607,386 @@ def create_rounded_rect(
     return canvas.create_polygon(points, smooth=True, splinesteps=16, **kwargs)
 
 
+PIXEL_DINO_FRAMES: tuple[tuple[str, ...], ...] = (
+    (
+        "        ####",
+        "       ##  ###",
+        "       #######",
+        "       ###    ",
+        "#     #####   ",
+        "##   #######  ",
+        "###########   ",
+        " #########    ",
+        "  #######     ",
+        "   ##  ##     ",
+        "   #    ##    ",
+    ),
+    (
+        "        ####",
+        "       ##  ###",
+        "       #######",
+        "       ###    ",
+        "#     #####   ",
+        "##   #######  ",
+        "###########   ",
+        " #########    ",
+        "  #######     ",
+        "   ##  ##     ",
+        "  ##    #     ",
+    ),
+)
+
+
+def progress_marker_position(
+    width: float,
+    value: float,
+    maximum: float,
+    marker_width: float,
+    padding: float = 4.0,
+) -> float:
+    """Position a marker within a progress track and clamp out-of-range values."""
+    usable_width = max(0.0, float(width) - marker_width - padding * 2)
+    if maximum <= 0:
+        ratio = 0.0
+    else:
+        ratio = max(0.0, min(1.0, float(value) / float(maximum)))
+    return padding + usable_width * ratio
+
+
+class RoundedDinoProgressBar(tk.Canvas):
+    """Rounded progress track with a tiny skateboarding pixel dinosaur."""
+
+    TRACK_COLOR = "#e2e5eb"
+    TRAIL_COLOR = "#b9dcff"
+    DINO_COLOR = "#1d1d1f"
+    DINO_EYE_COLOR = "#a8ff35"
+    SKATEBOARD_COLOR = "#a8ff35"
+    SKATEBOARD_EDGE_COLOR = "#5edfff"
+    SKATEBOARD_WHEEL_COLOR = "#af52de"
+    CANVAS_HEIGHT = 28
+    MARKER_WIDTH = 28.0
+    MARKER_PADDING = 4.0
+
+    def __init__(
+        self,
+        parent: tk.Misc,
+        *,
+        variable: tk.DoubleVar,
+        maximum: float = 100,
+        mode: str = "determinate",
+        bg: str = COLOR_SURFACE,
+    ) -> None:
+        super().__init__(
+            parent,
+            height=self.CANVAS_HEIGHT,
+            bg=bg,
+            highlightthickness=0,
+            bd=0,
+            relief="flat",
+        )
+        self._variable = variable
+        self._maximum = max(1.0, float(maximum))
+        self._mode = mode
+        self._explicit_running = False
+        self._animation_job: str | None = None
+        self._interval_ms = 84
+        self._frame_index = 0
+        self._indeterminate_x = self.MARKER_PADDING
+        self._indeterminate_direction = 1
+        self._trace_id = self._variable.trace_add("write", self._on_variable_changed)
+        self.bind("<Configure>", self._on_resize)
+        self.after_idle(self._render)
+
+    def configure(self, cnf=None, **kwargs):
+        options: dict = {}
+        if isinstance(cnf, dict):
+            options.update(cnf)
+        options.update(kwargs)
+        mode = options.pop("mode", None)
+        maximum = options.pop("maximum", None)
+        if mode is not None:
+            if mode not in {"determinate", "indeterminate"}:
+                raise tk.TclError(f"unsupported progress mode: {mode}")
+            if mode != self._mode:
+                self._mode = mode
+                self._indeterminate_x = self.MARKER_PADDING
+                self._indeterminate_direction = 1
+        if maximum is not None:
+            self._maximum = max(1.0, float(maximum))
+        result = super().configure(**options) if options else None
+        self._render()
+        self._ensure_animation()
+        return result
+
+    config = configure
+
+    def start(self, interval: int | float | None = None) -> None:
+        if interval is not None:
+            # ttk uses very short intervals by default; pixel legs remain clearer
+            # and use less CPU at roughly 12 frames per second.
+            self._interval_ms = max(70, int(interval))
+        self._explicit_running = True
+        self._ensure_animation()
+        self._render()
+
+    def stop(self) -> None:
+        self._explicit_running = False
+        self._cancel_animation()
+        self._render()
+
+    def destroy(self) -> None:
+        self._cancel_animation()
+        try:
+            self._variable.trace_remove("write", self._trace_id)
+        except (tk.TclError, ValueError):
+            pass
+        super().destroy()
+
+    def _on_resize(self, _event=None) -> None:
+        if self._mode == "indeterminate":
+            max_x = self._indeterminate_max_x()
+            self._indeterminate_x = max(
+                self.MARKER_PADDING,
+                min(max_x, self._indeterminate_x),
+            )
+        self._render()
+
+    def _on_variable_changed(self, *_args) -> None:
+        self._render()
+        self._ensure_animation()
+
+    def _current_value(self) -> float:
+        try:
+            return float(self._variable.get())
+        except (tk.TclError, TypeError, ValueError):
+            return 0.0
+
+    def _determinate_running(self) -> bool:
+        value = self._current_value()
+        return self._mode == "determinate" and 0.0 < value < self._maximum
+
+    def _should_animate(self) -> bool:
+        return self._explicit_running or self._determinate_running()
+
+    def _ensure_animation(self) -> None:
+        if not self._should_animate():
+            self._cancel_animation()
+            return
+        if self._animation_job is None:
+            self._animation_job = self.after(self._interval_ms, self._animate)
+
+    def _cancel_animation(self) -> None:
+        if self._animation_job is None:
+            return
+        try:
+            self.after_cancel(self._animation_job)
+        except tk.TclError:
+            pass
+        self._animation_job = None
+
+    def _animate(self) -> None:
+        self._animation_job = None
+        self._frame_index = (self._frame_index + 1) % len(PIXEL_DINO_FRAMES)
+        if self._mode == "indeterminate" and self._explicit_running:
+            self._move_indeterminate_dino()
+        self._render()
+        self._ensure_animation()
+
+    def _indeterminate_max_x(self) -> float:
+        width = max(float(self.winfo_width()), 80.0)
+        return max(
+            self.MARKER_PADDING,
+            width - self.MARKER_WIDTH - self.MARKER_PADDING,
+        )
+
+    def _move_indeterminate_dino(self) -> None:
+        min_x = self.MARKER_PADDING
+        max_x = self._indeterminate_max_x()
+        travel_step = max(3.0, min(8.0, float(self.winfo_width()) / 140.0))
+        self._indeterminate_x += travel_step * self._indeterminate_direction
+        if self._indeterminate_x >= max_x:
+            self._indeterminate_x = max_x
+            self._indeterminate_direction = -1
+        elif self._indeterminate_x <= min_x:
+            self._indeterminate_x = min_x
+            self._indeterminate_direction = 1
+
+    def _render(self) -> None:
+        if not self.winfo_exists():
+            return
+        width = max(float(self.winfo_width()), 80.0)
+        height = max(float(self.winfo_height()), float(self.CANVAS_HEIGHT))
+        self.delete("all")
+
+        track_x1 = 1.0
+        track_x2 = width - 1.0
+        track_height = 10.0
+        track_y1 = (height - track_height) / 2
+        track_y2 = track_y1 + track_height
+        create_rounded_rect(
+            self,
+            track_x1,
+            track_y1,
+            track_x2,
+            track_y2,
+            5,
+            fill=self.TRACK_COLOR,
+            outline="",
+        )
+
+        value = self._current_value()
+        if self._mode == "indeterminate":
+            marker_x = self._indeterminate_x
+            self._draw_indeterminate_trail(
+                marker_x,
+                track_y1,
+                track_y2,
+                width,
+            )
+            show_dino = self._explicit_running
+            direction = self._indeterminate_direction
+        else:
+            marker_x = progress_marker_position(
+                width,
+                value,
+                self._maximum,
+                self.MARKER_WIDTH,
+                self.MARKER_PADDING,
+            )
+            ratio = max(0.0, min(1.0, value / self._maximum))
+            fill_x2 = track_x1 + (track_x2 - track_x1) * ratio
+            if fill_x2 > track_x1:
+                create_rounded_rect(
+                    self,
+                    track_x1,
+                    track_y1,
+                    fill_x2,
+                    track_y2,
+                    5,
+                    fill=COLOR_BLUE,
+                    outline="",
+                )
+            show_dino = value > 0.0 or self._explicit_running
+            direction = 1
+
+        if show_dino:
+            marker_y = max(1.0, (height - 21.0) / 2)
+            self._draw_pixel_dino(
+                marker_x + 4.0,
+                marker_y,
+                direction,
+            )
+            self._draw_pixel_skateboard(
+                marker_x,
+                marker_y + 15.5,
+                direction,
+            )
+
+    def _draw_indeterminate_trail(
+        self,
+        marker_x: float,
+        track_y1: float,
+        track_y2: float,
+        width: float,
+    ) -> None:
+        trail_width = max(34.0, min(72.0, width * 0.09))
+        if self._indeterminate_direction > 0:
+            trail_x1 = max(1.0, marker_x - trail_width)
+            trail_x2 = min(width - 1.0, marker_x + self.MARKER_WIDTH * 0.75)
+        else:
+            trail_x1 = max(1.0, marker_x + self.MARKER_WIDTH * 0.25)
+            trail_x2 = min(width - 1.0, marker_x + self.MARKER_WIDTH + trail_width)
+        if trail_x2 > trail_x1:
+            create_rounded_rect(
+                self,
+                trail_x1,
+                track_y1,
+                trail_x2,
+                track_y2,
+                5,
+                fill=self.TRAIL_COLOR,
+                outline="",
+            )
+
+    def _draw_pixel_dino(self, x: float, y: float, direction: int) -> None:
+        frame = PIXEL_DINO_FRAMES[self._frame_index]
+        pixel_size = 1.35
+        width_cells = max(len(row) for row in frame)
+        for row_index, row in enumerate(frame):
+            for column_index, cell in enumerate(row):
+                if cell != "#":
+                    continue
+                visual_column = (
+                    column_index
+                    if direction >= 0
+                    else width_cells - column_index - 1
+                )
+                x1 = x + visual_column * pixel_size
+                y1 = y + row_index * pixel_size
+                self.create_rectangle(
+                    x1,
+                    y1,
+                    x1 + pixel_size + 0.2,
+                    y1 + pixel_size + 0.2,
+                    fill=self.DINO_COLOR,
+                    outline="",
+                )
+
+        eye_column = 10 if direction >= 0 else width_cells - 11
+        eye_x = x + eye_column * pixel_size
+        eye_y = y + pixel_size
+        self.create_rectangle(
+            eye_x,
+            eye_y,
+            eye_x + pixel_size * 0.72,
+            eye_y + pixel_size * 0.72,
+            fill=self.DINO_EYE_COLOR,
+            outline="",
+        )
+
+    def _draw_pixel_skateboard(
+        self,
+        x: float,
+        y: float,
+        direction: int,
+    ) -> None:
+        board_x1 = x + 1.0
+        board_x2 = x + self.MARKER_WIDTH - 1.0
+        create_rounded_rect(
+            self,
+            board_x1,
+            y,
+            board_x2,
+            y + 3.2,
+            2,
+            fill=self.SKATEBOARD_COLOR,
+            outline="",
+        )
+
+        nose_x1 = board_x2 - 4.0 if direction >= 0 else board_x1
+        nose_x2 = board_x2 if direction >= 0 else board_x1 + 4.0
+        self.create_rectangle(
+            nose_x1,
+            y,
+            nose_x2,
+            y + 1.2,
+            fill=self.SKATEBOARD_EDGE_COLOR,
+            outline="",
+        )
+
+        wheel_y = y + 4.2
+        wheel_bob = 0.7 if self._frame_index else 0.0
+        for wheel_x in (x + 6.0, x + self.MARKER_WIDTH - 6.0):
+            self.create_oval(
+                wheel_x - 1.7,
+                wheel_y - 1.1 + wheel_bob,
+                wheel_x + 1.7,
+                wheel_y + 2.3 + wheel_bob,
+                fill=self.SKATEBOARD_WHEEL_COLOR,
+                outline="",
+            )
+
+
 class YTAudioDownloaderApp:
     def __init__(self, root: tk.Tk):
         self.root = root
@@ -1313,6 +2060,9 @@ class YTAudioDownloaderApp:
         self.auto_transcribe_path_map: dict[Path, str] = {}
         self.pending_research_item_ids: set[str] = set()
         self.manual_link_expanded = False
+        self.topic_filter_buttons: dict[str, tk.Canvas] = {}
+        self.refresh_indicator_hide_job: str | None = None
+        self.refresh_owns_progress = False
 
         self.url_var = tk.StringVar()
         self.download_dir_var = tk.StringVar()
@@ -1327,6 +2077,7 @@ class YTAudioDownloaderApp:
         self.transcription_workers_var = tk.StringVar(value="4")
         self.status_var = tk.StringVar(value="准备就绪")
         self.summary_var = tk.StringVar(value="还没有读取任何节目")
+        self.refresh_indicator_var = tk.StringVar(value="")
         self.current_task_var = tk.StringVar(value="当前任务：无")
         self.results_summary_var = tk.StringVar(value="还没有生成转录或纪要")
         self.reader_title_var = tk.StringVar(value="选择一条资料开始阅读")
@@ -1472,6 +2223,12 @@ class YTAudioDownloaderApp:
 
     def on_app_close(self) -> None:
         self.app_closing = True
+        if self.refresh_indicator_hide_job is not None:
+            try:
+                self.root.after_cancel(self.refresh_indicator_hide_job)
+            except tk.TclError:
+                pass
+            self.refresh_indicator_hide_job = None
         if self.research_library_save_job is not None:
             try:
                 self.root.after_cancel(self.research_library_save_job)
@@ -1669,7 +2426,14 @@ class YTAudioDownloaderApp:
             tag.bind("<Leave>", on_leave)
         return canvas
 
-    def configure_ui_button(self, button: tk.Canvas, text: str, variant: str) -> None:
+    def configure_ui_button(
+        self,
+        button: tk.Canvas,
+        text: str,
+        variant: str,
+        *,
+        strong: bool | None = None,
+    ) -> None:
         bg_item = getattr(button, "_ui_button_bg", None)
         text_item = getattr(button, "_ui_button_text", None)
         if bg_item is None or text_item is None:
@@ -1682,6 +2446,11 @@ class YTAudioDownloaderApp:
             outline=COLOR_BORDER if variant == "secondary" else bg,
         )
         button.itemconfigure(text_item, text=text, fill=fg)
+        if strong is not None:
+            button.itemconfigure(
+                text_item,
+                font=(FONT_UI, 10, "bold" if strong else "normal"),
+            )
 
     def ui_menu_button(
         self,
@@ -1901,10 +2670,26 @@ class YTAudioDownloaderApp:
             font=(FONT_DISPLAY, 22, "bold"),
         ).pack(side="left", padx=32)
         self.ui_label(player, textvariable=self.selected_count_var, fg=COLOR_MUTED, bg=COLOR_BG).pack(side="left", padx=(0, 12))
-        self.ui_button(player, "养生", self.fetch_science_wellness_updates, variant="secondary", padx=13, pady=5).pack(side="right", padx=(5, 26), pady=9)
-        self.ui_button(player, "天气", self.fetch_weather_agri_updates, variant="secondary", padx=13, pady=5).pack(side="right", padx=5, pady=9)
-        self.ui_button(player, "AI", self.fetch_ai_updates, variant="secondary", padx=13, pady=5).pack(side="right", padx=5, pady=9)
-        self.ui_button(player, "综合", self.fetch_all_updates, variant="accent", strong=True, padx=15, pady=5).pack(side="right", padx=5, pady=9)
+        topic_buttons = [
+            ("science_wellness", self.fetch_science_wellness_updates, 13, (5, 26)),
+            ("weather_agri", self.fetch_weather_agri_updates, 13, 5),
+            ("ai_startup", self.fetch_ai_startup_updates, 13, 5),
+            ("ai", self.fetch_ai_updates, 13, 5),
+            ("all", self.fetch_all_updates, 15, 5),
+        ]
+        for topic, command, button_padx, pack_padx in topic_buttons:
+            button = self.ui_button(
+                player,
+                TOPIC_FILTER_LABELS[topic],
+                command,
+                variant=topic_filter_variant(topic, self.current_topic),
+                strong=topic == self.current_topic,
+                padx=button_padx,
+                pady=5,
+            )
+            button.pack(side="right", padx=pack_padx, pady=9)
+            self.topic_filter_buttons[topic] = button
+        self.update_topic_filter_buttons()
 
         body = tk.Frame(parent, bg=COLOR_BG, padx=32, pady=8)
         body.pack(fill="both", expand=True)
@@ -1984,8 +2769,25 @@ class YTAudioDownloaderApp:
             pady=5,
         ).pack(side="left", padx=(6, 0))
 
-        self.summary_label = self.ui_label(body, textvariable=self.summary_var, fg=COLOR_BLUE, bg=COLOR_BG, weight="bold")
-        self.summary_label.pack(anchor="w", pady=(0, 4))
+        summary_line = tk.Frame(body, bg=COLOR_BG)
+        summary_line.pack(fill="x", pady=(0, 4))
+        self.summary_label = self.ui_label(
+            summary_line,
+            textvariable=self.summary_var,
+            fg=COLOR_BLUE,
+            bg=COLOR_BG,
+            weight="bold",
+        )
+        self.summary_label.pack(side="left", anchor="w")
+        self.refresh_indicator = tk.Label(
+            summary_line,
+            textvariable=self.refresh_indicator_var,
+            fg="white",
+            bg=COLOR_BLUE,
+            padx=9,
+            pady=3,
+            font=(FONT_UI, 9, "bold"),
+        )
 
         self.cards_area = tk.Frame(body, bg=COLOR_BG)
         self.cards_area.pack(fill="both", expand=True)
@@ -2014,11 +2816,96 @@ class YTAudioDownloaderApp:
         self.ui_label(footer_top, textvariable=self.current_task_var, fg=COLOR_TEXT, bg=COLOR_SURFACE, weight="bold").pack(side="left")
         progress_line = tk.Frame(footer_top, bg=COLOR_SURFACE)
         progress_line.pack(side="left", fill="x", expand=True, padx=(20, 0))
-        self.progress_bar = ttk.Progressbar(progress_line, variable=self.progress_value, maximum=100)
+        self.progress_bar = RoundedDinoProgressBar(
+            progress_line,
+            variable=self.progress_value,
+            maximum=100,
+            bg=COLOR_SURFACE,
+        )
         self.progress_bar.pack(side="left", fill="x", expand=True)
         self.ui_label(progress_line, textvariable=self.progress_percent_var, fg=COLOR_MUTED, bg=COLOR_SURFACE).pack(side="left", padx=(10, 0))
         self.ui_label(footer, textvariable=self.status_var, fg=COLOR_MUTED, bg=COLOR_SURFACE).pack(anchor="w", pady=(3, 0))
         self.render_cards()
+
+    def update_topic_filter_buttons(self) -> None:
+        for topic, button in self.topic_filter_buttons.items():
+            selected = topic == self.current_topic
+            self.configure_ui_button(
+                button,
+                TOPIC_FILTER_LABELS[topic],
+                topic_filter_variant(topic, self.current_topic),
+                strong=selected,
+            )
+
+    def begin_feed_refresh(self, topic: str, *, showing_cache: bool) -> None:
+        label = topic_display_label(topic)
+        if self.refresh_indicator_hide_job is not None:
+            try:
+                self.root.after_cancel(self.refresh_indicator_hide_job)
+            except tk.TclError:
+                pass
+            self.refresh_indicator_hide_job = None
+
+        indicator = getattr(self, "refresh_indicator", None)
+        if isinstance(indicator, tk.Label):
+            self.refresh_indicator_var.set(f"↻ 正在刷新 · {label}")
+            indicator.configure(bg=COLOR_BLUE, fg="white")
+            if not indicator.winfo_manager():
+                indicator.pack(side="right", padx=(12, 0))
+
+        self.current_task_var.set(f"当前任务：正在刷新{label}最新节目")
+        self.set_status(
+            f"正在后台刷新{label}最新节目，当前列表仍可浏览..."
+            if showing_cache
+            else f"正在搜索{label}最新节目，请稍候..."
+        )
+        self.refresh_owns_progress = not (
+            self.downloading or self.researching or self.transcribing
+        )
+        if self.refresh_owns_progress and hasattr(self, "progress_bar"):
+            self.progress_value.set(0)
+            self.progress_bar.stop()
+            self.progress_bar.configure(mode="indeterminate")
+            self.progress_bar.start(12)
+            self.progress_percent_var.set("刷新中")
+
+    def finish_feed_refresh(self, *, success: bool, used_cache: bool = False) -> None:
+        label = topic_display_label(self.current_topic)
+        if self.refresh_owns_progress and hasattr(self, "progress_bar"):
+            self.progress_bar.stop()
+            self.progress_bar.configure(mode="determinate")
+            self.progress_value.set(0)
+            self.progress_percent_var.set("0%")
+        self.refresh_owns_progress = False
+
+        indicator = getattr(self, "refresh_indicator", None)
+        if not isinstance(indicator, tk.Label):
+            return
+        if success:
+            self.refresh_indicator_var.set(f"✓ 刷新完成 · {label}")
+            indicator.configure(bg=COLOR_GREEN, fg=COLOR_TEXT)
+            hide_delay = 1800
+        elif used_cache:
+            self.refresh_indicator_var.set(f"! 实时刷新失败 · 已用缓存")
+            indicator.configure(bg=COLOR_RED, fg="white")
+            hide_delay = 4200
+        else:
+            self.refresh_indicator_var.set(f"! 刷新失败 · {label}")
+            indicator.configure(bg=COLOR_RED, fg="white")
+            hide_delay = 4200
+        if not indicator.winfo_manager():
+            indicator.pack(side="right", padx=(12, 0))
+        self.refresh_indicator_hide_job = self.root.after(
+            hide_delay,
+            self.hide_feed_refresh_indicator,
+        )
+
+    def hide_feed_refresh_indicator(self) -> None:
+        self.refresh_indicator_hide_job = None
+        indicator = getattr(self, "refresh_indicator", None)
+        if isinstance(indicator, tk.Label):
+            indicator.pack_forget()
+        self.refresh_indicator_var.set("")
 
     def toggle_manual_link_panel(self) -> None:
         self.manual_link_expanded = not self.manual_link_expanded
@@ -2137,7 +3024,7 @@ class YTAudioDownloaderApp:
             empty_text = (
                 "还没有精选节目。遇到值得长期保留的内容，先选中卡片，再点「精选」。"
                 if self.current_topic == "favorites"
-                else "点击右上角「综合雷达」，分区查看 AI、天气农业和科学养生播客更新。"
+                else "点击右上角「综合雷达」，分区查看 AI、AI创业、天气农业和科学养生播客更新。"
             )
             tk.Label(
                 empty,
@@ -2208,12 +3095,15 @@ class YTAudioDownloaderApp:
             return [("", "", self.video_items)]
 
         ai_items: list[VideoItem] = []
+        ai_startup_items: list[VideoItem] = []
         weather_agri_items: list[VideoItem] = []
         science_wellness_items: list[VideoItem] = []
         other_items: list[VideoItem] = []
         for item in self.video_items:
             if item.source_name in WEATHER_AGRI_FEED_NAMES:
                 weather_agri_items.append(item)
+            elif item.source_name in AI_STARTUP_FEED_NAMES:
+                ai_startup_items.append(item)
             elif item.source_name in AI_FEED_NAMES:
                 ai_items.append(item)
             elif item.source_name in SCIENCE_WELLNESS_FEED_NAMES:
@@ -2223,7 +3113,9 @@ class YTAudioDownloaderApp:
 
         sections: list[tuple[str, str, list[VideoItem]]] = []
         if ai_items:
-            sections.append(("AI 播客", "模型、算力、产品与创业更新", ai_items))
+            sections.append(("AI 播客", "模型、算力、产品与产业动态", ai_items))
+        if ai_startup_items:
+            sections.append(("AI创业", "创始人故事、产品从 0 到 1、获客与商业化", ai_startup_items))
         if weather_agri_items:
             sections.append(("天气农业", "ENSO、气候、作物与农产品市场", weather_agri_items))
         if science_wellness_items:
@@ -4249,7 +5141,8 @@ class YTAudioDownloaderApp:
 
     def show_favorite_items(self) -> None:
         self.current_topic = "favorites"
-        self.download_title_var.set("我的精选")
+        self.download_title_var.set(topic_download_title(self.current_topic))
+        self.update_topic_filter_buttons()
         self.show_page("download", nav_key="favorites")
         favorite_items = self.cached_podcast_items("favorites")
         self.apply_fetch_payload(
@@ -6687,6 +7580,8 @@ class YTAudioDownloaderApp:
 
     def on_auto_digest_done(self, payload: dict) -> None:
         self.auto_digests_running = False
+        if hasattr(self, "progress_bar"):
+            self.progress_bar.stop()
         self.current_task_var.set("当前任务：自动中文整理完成")
         message = (
             f"自动中文整理结束：新整理 {payload['completed']} 个，"
@@ -6739,6 +7634,8 @@ class YTAudioDownloaderApp:
                 self.on_fetch_success(payload)
             elif event_type == "fetch_error":
                 self.fetching = False
+                self.finish_feed_refresh(success=False)
+                self.current_task_var.set("当前任务：刷新失败")
                 self.set_status(payload)
                 messagebox.showerror("读取失败", payload)
             elif event_type == "row_status":
@@ -6752,6 +7649,8 @@ class YTAudioDownloaderApp:
                 self.on_download_finished(payload)
             elif event_type == "queue_stopped":
                 self.downloading = False
+                if hasattr(self, "progress_bar"):
+                    self.progress_bar.stop()
                 self.current_task_var.set("当前任务：下载已停止")
                 self.set_status("下载队列已停止")
             elif event_type == "log":
@@ -6825,6 +7724,9 @@ class YTAudioDownloaderApp:
 
     def fetch_videos(self) -> None:
         if self.fetching:
+            self.set_status(
+                f"正在刷新{topic_display_label(self.current_topic)}，完成后再读取新链接。"
+            )
             return
 
         url = self.url_var.get().strip()
@@ -6834,10 +7736,11 @@ class YTAudioDownloaderApp:
 
         self.fetching = True
         self.current_topic = "manual"
-        self.download_title_var.set("今日雷达")
+        self.download_title_var.set(topic_download_title(self.current_topic))
+        self.update_topic_filter_buttons()
         self.set_active_nav("download")
-        self.set_status("正在读取节目列表...")
         self.summary_var.set("正在读取，请稍候...")
+        self.begin_feed_refresh("manual", showing_cache=False)
         threading.Thread(target=self.fetch_worker, args=(url,), daemon=True).start()
 
     def fetch_current_source(self) -> None:
@@ -6848,6 +7751,9 @@ class YTAudioDownloaderApp:
 
     def fetch_ai_updates(self) -> None:
         self.fetch_topic_updates("ai")
+
+    def fetch_ai_startup_updates(self) -> None:
+        self.fetch_topic_updates("ai_startup")
 
     def fetch_weather_agri_updates(self) -> None:
         self.fetch_topic_updates("weather_agri")
@@ -6860,11 +7766,15 @@ class YTAudioDownloaderApp:
 
     def fetch_topic_updates(self, topic: str) -> None:
         if self.fetching:
+            self.set_status(
+                f"正在刷新{topic_display_label(self.current_topic)}，完成后再切换栏目。"
+            )
             return
         label = PODCAST_GROUP_LABELS.get(topic, "播客")
         self.url_var.set("")
         self.current_topic = topic
-        self.download_title_var.set("今日雷达")
+        self.download_title_var.set(topic_download_title(topic))
+        self.update_topic_filter_buttons()
         self.set_active_nav("download")
         cached_items = self.cached_podcast_items(topic)
         if cached_items and not self.video_items:
@@ -6884,9 +7794,9 @@ class YTAudioDownloaderApp:
             self.set_status(f"已显示本地快照，正在后台刷新{label}最新节目...")
             self.current_task_var.set("当前任务：后台刷新最新节目")
         else:
-            self.set_status(f"正在搜索{label}更新...")
             self.summary_var.set(f"正在搜索{label}更新...")
         self.fetching = True
+        self.begin_feed_refresh(topic, showing_cache=bool(cached_items))
         threading.Thread(target=self.fetch_topic_worker, args=(topic,), daemon=True).start()
 
     def fetch_worker(self, url: str) -> None:
@@ -6990,6 +7900,8 @@ class YTAudioDownloaderApp:
         source_name = str(record.get("source_name") or "")
         if topic == "ai":
             return source_name in AI_FEED_NAMES
+        if topic == "ai_startup":
+            return source_name in AI_STARTUP_FEED_NAMES
         if topic == "weather_agri":
             return source_name in WEATHER_AGRI_FEED_NAMES
         if topic == "science_wellness":
@@ -7046,6 +7958,11 @@ class YTAudioDownloaderApp:
             start_translations=not is_cache_preview,
             persist_records=not is_cache_preview,
         )
+        if is_cache_preview:
+            self.current_task_var.set("当前任务：实时刷新失败，已显示本地缓存")
+            self.finish_feed_refresh(success=False, used_cache=True)
+        else:
+            self.finish_feed_refresh(success=True)
 
     def update_row(self, video_id: str, status: str | None = None, progress: str | None = None) -> None:
         item = self.video_map.get(video_id)
@@ -7778,6 +8695,8 @@ class YTAudioDownloaderApp:
 
     def on_download_finished(self, payload: dict) -> None:
         self.downloading = False
+        if hasattr(self, "progress_bar"):
+            self.progress_bar.stop()
         completed = payload["completed"]
         failed = payload["failed"]
         skipped = payload["skipped"]
@@ -7863,6 +8782,8 @@ class YTAudioDownloaderApp:
 
     def on_research_finished(self, payload: dict) -> None:
         self.researching = False
+        if hasattr(self, "progress_bar"):
+            self.progress_bar.stop()
         lightweight = int(payload.get("lightweight") or 0)
         message = (
             f"研究整理结束：新整理 {payload['completed']} 个，"
@@ -8023,29 +8944,12 @@ class YTAudioDownloaderApp:
                     )
                 )
 
-        base_opts = {
-            "format": "bestaudio/best",
-            "outtmpl": outtmpl,
-            "quiet": True,
-            "no_warnings": True,
-            "socket_timeout": 15,
-            "retries": 1,
-            "fragment_retries": 1,
-            "extractor_retries": 1,
-            "remote_components": {"ejs:github"},
-            "progress_hooks": [progress_hook],
-            "postprocessors": [
-                {
-                    "key": "FFmpegExtractAudio",
-                    "preferredcodec": audio_format,
-                    "preferredquality": "192",
-                }
-            ],
-            "extractor_args": {"youtube": {"player_client": ["web"]}},
-        }
-        ffmpeg_path = ensure_ffmpeg_on_path()
-        if ffmpeg_path:
-            base_opts["ffmpeg_location"] = ffmpeg_path
+        base_opts = build_youtube_download_options(
+            outtmpl,
+            audio_format,
+            progress_hook,
+            ensure_ffmpeg_on_path(),
+        )
 
         self.events.put(("row_status", (item.video_id, "准备下载", "0%")))
         last_errors: list[str] = []
@@ -8576,8 +9480,43 @@ def build_download_attempts(base_opts: dict, cookie_file: str, browser_cookies: 
     return attempts
 
 
+def build_youtube_download_options(
+    outtmpl: str,
+    audio_format: str,
+    progress_hook,
+    ffmpeg_path: str | None = None,
+) -> dict:
+    """Build stable yt-dlp options without pinning a fragile YouTube client."""
+    opts = {
+        "format": "bestaudio/best",
+        "outtmpl": outtmpl,
+        "quiet": True,
+        "no_warnings": True,
+        "socket_timeout": 15,
+        "retries": 1,
+        "fragment_retries": 1,
+        "extractor_retries": 1,
+        "remote_components": {"ejs:github"},
+        "progress_hooks": [progress_hook],
+        "postprocessors": [
+            {
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": audio_format,
+                "preferredquality": "192",
+            }
+        ],
+    }
+    if ffmpeg_path:
+        opts["ffmpeg_location"] = ffmpeg_path
+    return opts
+
+
 def fetch_ai_podcast_updates() -> tuple[str, list[VideoItem], int, str | None]:
     return fetch_podcast_updates("ai")
+
+
+def fetch_ai_startup_podcast_updates() -> tuple[str, list[VideoItem], int, str | None]:
+    return fetch_podcast_updates("ai_startup")
 
 
 def fetch_weather_agri_podcast_updates() -> tuple[str, list[VideoItem], int, str | None]:
@@ -8846,7 +9785,9 @@ def compact_ffmpeg_error(stderr: str, max_chars: int = 260) -> str:
     return clean_ui_status(text or "未知错误", max_chars)
 
 
-def is_relevant_podcast_item(feed: PodcastFeed, title: str) -> bool:
+def is_relevant_podcast_item(feed: PodcastFeed, title: str, description: str = "") -> bool:
+    if feed.name in AI_STARTUP_FEED_NAMES:
+        return is_ai_startup_story_item(title, description, feed.name)
     if feed.name not in WEATHER_AGRI_FEED_NAMES:
         return True
 
@@ -8875,7 +9816,8 @@ def fetch_podcast_feed_items(feed: PodcastFeed) -> tuple[list[tuple[datetime | N
         if not title or not audio_url:
             skipped += 1
             continue
-        if not is_relevant_podcast_item(feed, title):
+        description_text = episode_description(entry)
+        if not is_relevant_podcast_item(feed, title, description_text):
             skipped += 1
             continue
 
@@ -8889,7 +9831,6 @@ def fetch_podcast_feed_items(feed: PodcastFeed) -> tuple[list[tuple[datetime | N
         duration_text = parse_podcast_duration(first_child_text(entry, "duration"))
         date_prefix = published_at.astimezone().strftime("%Y-%m-%d") if published_at else "日期未知"
         artwork_url = podcast_image_url(entry) or feed_artwork_url
-        description_text = episode_description(entry)
         item_id = "rss-" + hashlib.sha1(f"{feed.feed_url}|{guid}|{audio_url}".encode("utf-8")).hexdigest()[:14]
         rows.append(
             (
@@ -8936,6 +9877,13 @@ def fetch_youtube_feed_items(feed: YouTubeFeed) -> tuple[list[tuple[datetime | N
         published_at = parse_podcast_datetime(first_child_text(entry, "published") or first_child_text(entry, "updated"))
         date_prefix = published_at.astimezone().strftime("%Y-%m-%d") if published_at else "日期未知"
         description_text = youtube_media_text(entry, "description")
+        if feed.topic == "ai_startup" and not is_ai_startup_story_item(
+            title,
+            description_text,
+            feed.name,
+        ):
+            skipped += 1
+            continue
         artwork_url = youtube_thumbnail_url(entry) or feed.artwork_url
         rows.append(
             (
@@ -8964,6 +9912,13 @@ def fetch_xiaoyuzhou_feed_items(feed: XiaoyuzhouFeed) -> tuple[list[tuple[dateti
     rows: list[tuple[datetime | None, VideoItem]] = []
     for item in items:
         item.source_name = feed.name
+        if feed.topic == "ai_startup" and not is_ai_startup_story_item(
+            item.title,
+            item.description_text,
+            feed.name,
+        ):
+            skipped += 1
+            continue
         if feed.artwork_url and not item.artwork_url:
             item.artwork_url = feed.artwork_url
         rows.append((parse_item_date(item.published_text), item))
@@ -9509,6 +10464,12 @@ def main() -> None:
     except Exception:
         pass
     app = YTAudioDownloaderApp(root)
+    if "--start-page" in sys.argv:
+        page_index = sys.argv.index("--start-page") + 1
+        if page_index < len(sys.argv):
+            start_page = sys.argv[page_index].strip()
+            if start_page in app.pages:
+                root.after(80, lambda key=start_page: app.show_page(key))
     root.mainloop()
 
 

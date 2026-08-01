@@ -1,9 +1,9 @@
 {
   "schema_version": "1.0.0",
   "module_id": "person-monitor",
-  "module_version": "0.2.0",
-  "host_base_version": "0.4.29",
-  "host_base_main_sha256": "e1062c857090c5eb5b81aeeb0d9dce27069864af3f39b3def7b1ecd62e7f9722",
+  "module_version": "0.3.1",
+  "host_base_version": "0.4.33",
+  "host_base_main_sha256": "6cfe05d66977764bfff4173e984e39987c60068360e042769bc85fdafa388c57",
   "source_snapshot": {
     "repository": "private-person-monitor",
     "commit": "e280a79",

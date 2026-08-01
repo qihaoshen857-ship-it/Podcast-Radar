@@ -272,6 +272,15 @@
       ],
       "searches": [
         {
+          "key": "elon-musk-archive-interviews",
+          "name": "Elon Musk Archive 公开访谈档案",
+          "kind": "elon_archive_interviews",
+          "locator": "https://elonmuskarchive.org/agents/search",
+          "archive_type": "interview",
+          "result_limit": 30,
+          "max_items": 24
+        },
+        {
           "key": "itunes-elon-podcast-search",
           "name": "Apple Podcasts Elon 做客发现",
           "kind": "itunes_episode_search",
