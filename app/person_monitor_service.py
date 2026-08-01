@@ -24,8 +24,8 @@ from xml.etree import ElementTree as ET
 import requests
 
 EXPORT_SCHEMA_VERSION = "1.0.0"
-MODULE_VERSION = "0.2.0"
-PERSON_MONITOR_USER_AGENT = "PodcastRadar-PersonMonitor/0.2.0"
+MODULE_VERSION = "0.3.1"
+PERSON_MONITOR_USER_AGENT = "PodcastRadar-PersonMonitor/0.3.1"
 REQUEST_TIMEOUT = (10, 45)
 TRACKING_QUERY_KEYS = {
     "fbclid",
@@ -270,10 +270,64 @@ def _entry_link(element: ET.Element) -> str:
     return ""
 
 
+def _image_url_from_element(element: ET.Element) -> str:
+    for key in ("href", "url", "src"):
+        value = str(element.attrib.get(key) or "").strip()
+        if value.startswith(("http://", "https://")):
+            return value
+    if element.text:
+        value = element.text.strip()
+        if value.startswith(("http://", "https://")):
+            return value
+    for child in element.iter():
+        if child is element:
+            continue
+        if _local_name(child.tag) not in {"url", "image", "thumbnail"}:
+            continue
+        for key in ("href", "url", "src"):
+            value = str(child.attrib.get(key) or "").strip()
+            if value.startswith(("http://", "https://")):
+                return value
+        if child.text:
+            value = child.text.strip()
+            if value.startswith(("http://", "https://")):
+                return value
+    return ""
+
+
+def _feed_artwork_url(channel: ET.Element) -> str:
+    for child in list(channel):
+        if _local_name(child.tag) in {"item", "entry"}:
+            continue
+        if _local_name(child.tag) in {"image", "logo", "icon"}:
+            value = _image_url_from_element(child)
+            if value:
+                return value
+    return ""
+
+
+def _entry_artwork_url(entry: ET.Element) -> str:
+    for child in entry.iter():
+        local_name = _local_name(child.tag)
+        if local_name in {"image", "thumbnail"}:
+            value = _image_url_from_element(child)
+            if value:
+                return value
+        if local_name in {"content", "enclosure"}:
+            media_type = str(child.attrib.get("type") or "").casefold()
+            medium = str(child.attrib.get("medium") or "").casefold()
+            if media_type.startswith("image/") or medium == "image":
+                value = _image_url_from_element(child)
+                if value:
+                    return value
+    return ""
+
+
 def parse_feed_entries(content: bytes) -> tuple[str, list[dict[str, str]]]:
     root = ET.fromstring(content)
     channel = next((node for node in root.iter() if _local_name(node.tag) == "channel"), root)
     channel_title = _first_text(channel, ("title",)) or "官方 Feed"
+    channel_artwork_url = _feed_artwork_url(channel)
     entries = [node for node in root.iter() if _local_name(node.tag) in {"item", "entry"}]
     parsed: list[dict[str, str]] = []
     for entry in entries:
@@ -292,6 +346,7 @@ def parse_feed_entries(content: bytes) -> tuple[str, list[dict[str, str]]]:
                     "description": description,
                     "published": published,
                     "author": author,
+                    "artwork_url": _entry_artwork_url(entry) or channel_artwork_url,
                 }
             )
     return channel_title, parsed
@@ -335,13 +390,14 @@ def discover_feed(
         candidate_hash = hashlib.sha256(provider_id.encode("utf-8")).hexdigest()[:24]
         items.append(
             {
-                "schema_version": "0.3.0",
+                "schema_version": "0.3.1",
                 "candidate_key": f"{source['key']}:{candidate_hash}",
                 "source_key": source["key"],
                 "provider_item_id": provider_id,
                 "url": url,
                 "title": entry["title"],
                 "author_or_channel": entry.get("author") or channel_title,
+                "artwork_url": entry.get("artwork_url", ""),
                 "published_at": parse_publication_time(entry.get("published", "")),
                 "monitoring_classification": {
                     "person_slug": spec["slug"],
@@ -460,7 +516,7 @@ def discover_itunes_episodes(
         candidate_hash = hashlib.sha256(provider_id.encode("utf-8")).hexdigest()[:24]
         items.append(
             {
-                "schema_version": "0.3.0",
+                "schema_version": "0.3.1",
                 "candidate_key": f"{source['key']}:{candidate_hash}",
                 "source_key": source["key"],
                 "provider_item_id": provider_id,
@@ -468,6 +524,13 @@ def discover_itunes_episodes(
                 "title": title,
                 "author_or_channel": collection
                 or str(entry.get("artistName") or "Apple Podcasts"),
+                "artwork_url": str(
+                    entry.get("artworkUrl600")
+                    or entry.get("artworkUrl160")
+                    or entry.get("artworkUrl100")
+                    or entry.get("artworkUrl60")
+                    or ""
+                ).strip(),
                 "published_at": parse_publication_time(
                     str(entry.get("releaseDate") or "")
                 ),
@@ -501,6 +564,157 @@ def discover_itunes_episodes(
     return items, status
 
 
+def youtube_thumbnail_url(*urls: str) -> str:
+    patterns = (
+        r"(?:youtube\.com/(?:watch\?(?:[^#\s]*&)?v=|embed/|shorts/)|youtu\.be/)([A-Za-z0-9_-]{6,})",
+    )
+    for raw_url in urls:
+        for pattern in patterns:
+            match = re.search(pattern, raw_url or "", flags=re.IGNORECASE)
+            if match:
+                return f"https://i.ytimg.com/vi/{match.group(1)}/hqdefault.jpg"
+    return ""
+
+
+def _open_graph_image(page_url: str) -> str:
+    parsed = urlsplit(page_url)
+    if parsed.scheme not in {"http", "https"} or parsed.netloc.casefold() not in {
+        "elonmuskarchive.org",
+        "www.elonmuskarchive.org",
+    }:
+        return ""
+    try:
+        response = request_get(
+            page_url,
+            headers={"User-Agent": PERSON_MONITOR_USER_AGENT},
+            timeout=REQUEST_TIMEOUT,
+        )
+        response.raise_for_status()
+    except (requests.RequestException, ValueError):
+        return ""
+    page_text = str(getattr(response, "text", "") or "")
+    patterns = (
+        r'<meta[^>]+(?:property|name)=["\'](?:og:image|twitter:image)["\'][^>]+content=["\']([^"\']+)',
+        r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+(?:property|name)=["\'](?:og:image|twitter:image)["\']',
+    )
+    for pattern in patterns:
+        match = re.search(pattern, page_text, flags=re.IGNORECASE)
+        if match:
+            value = html.unescape(match.group(1)).strip()
+            if value.startswith(("http://", "https://")):
+                return value
+    return ""
+
+
+def archive_artwork_url(entry: dict[str, Any]) -> str:
+    explicit = str(
+        entry.get("artworkUrl")
+        or entry.get("thumbnailUrl")
+        or entry.get("imageUrl")
+        or entry.get("image")
+        or ""
+    ).strip()
+    if explicit.startswith(("http://", "https://")):
+        return explicit
+    youtube_image = youtube_thumbnail_url(
+        str(entry.get("source") or ""),
+        str(entry.get("embedUrl") or ""),
+    )
+    if youtube_image:
+        return youtube_image
+    return _open_graph_image(str(entry.get("url") or ""))
+
+
+def discover_elon_archive_interviews(
+    spec: dict[str, Any],
+    source: dict[str, Any],
+    *,
+    max_items: int = 24,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Read the latest transcript-backed appearances from Elon Musk Archive.
+
+    This source is intentionally limited to the Elon Musk person pack. The
+    archive returns a canonical page, original media URL and source label for
+    every result, making it more reliable for recent appearances than a broad
+    podcast-directory title search.
+    """
+
+    if spec.get("slug") != "elon-musk":
+        raise ValueError("Elon Musk Archive 只能用于 elon-musk 人物包")
+
+    endpoint = str(source.get("locator") or "https://elonmuskarchive.org/agents/search")
+    requested_limit = max(
+        max_items,
+        int(source.get("result_limit") or max_items),
+    )
+    response = request_get(
+        endpoint,
+        params={
+            "type": str(source.get("archive_type") or "interview"),
+            "sort": "date_desc",
+            "limit": min(100, requested_limit),
+            "snippet": 0,
+        },
+        headers={"User-Agent": PERSON_MONITOR_USER_AGENT},
+        timeout=REQUEST_TIMEOUT,
+    )
+    response.raise_for_status()
+    payload = response.json()
+    raw_results = payload.get("results", []) if isinstance(payload, dict) else []
+
+    items: list[dict[str, Any]] = []
+    for entry in raw_results:
+        if not isinstance(entry, dict) or entry.get("type") != "interview":
+            continue
+        provider_id = str(entry.get("id") or "").strip()
+        title = str(entry.get("title") or "").strip()
+        url = str(entry.get("url") or entry.get("source") or "").strip()
+        if not provider_id or not title or not url:
+            continue
+        published_at = parse_publication_time(str(entry.get("date") or ""))
+        items.append(
+            {
+                "schema_version": "0.3.1",
+                "candidate_key": f"{source['key']}:{provider_id}",
+                "source_key": source["key"],
+                "provider_item_id": provider_id,
+                "url": url,
+                "original_source_url": str(entry.get("source") or "").strip(),
+                "title": title,
+                "author_or_channel": str(
+                    entry.get("sourceLabel") or "Elon Musk Archive"
+                ).strip(),
+                "artwork_url": archive_artwork_url(entry),
+                "published_at": published_at,
+                "monitoring_classification": {
+                    "person_slug": spec["slug"],
+                    "status": "direct_expression_archived",
+                    "identity_match_basis": "transcript_backed_person_archive",
+                    "matched_aliases": ["elon musk"],
+                    "discovery_tier": "verified_archive",
+                    "speaker_or_author_confirmation_required": False,
+                },
+            }
+        )
+        if len(items) >= max_items:
+            break
+
+    status = {
+        "source_key": source["key"],
+        "source_name": source.get("name", source["key"]),
+        "kind": "elon_archive_interviews",
+        "status": "succeeded",
+        "item_count": len(items),
+        "related_mentions_filtered": 0,
+        "diagnostics": {
+            "archive_total": payload.get("total") if isinstance(payload, dict) else None,
+            "search_results": len(raw_results),
+            "selection_mode": "transcript_backed_person_archive",
+        },
+    }
+    return items, status
+
+
 def discover_source(
     spec: dict[str, Any],
     source: dict[str, Any],
@@ -510,6 +724,8 @@ def discover_source(
     kind = str(source.get("kind") or "podcast_rss")
     if kind == "itunes_episode_search":
         return discover_itunes_episodes(spec, source, max_items=max_items)
+    if kind == "elon_archive_interviews":
+        return discover_elon_archive_interviews(spec, source, max_items=max_items)
     return discover_feed(spec, source, max_items=max_items)
 
 
@@ -552,7 +768,13 @@ def refresh_person(
             items, status = discover_source(
                 spec,
                 source,
-                max_items=max_items_per_source,
+                max_items=max(
+                    1,
+                    min(
+                        100,
+                        int(source.get("max_items") or max_items_per_source),
+                    ),
+                ),
             )
         except Exception as exc:  # noqa: BLE001 - failures stay inside module boundary
             items = []
@@ -597,11 +819,23 @@ def refresh_person(
     unique_items: dict[str, dict[str, Any]] = {}
     for item in all_items:
         unique_items.setdefault(item_dedupe_key(item), item)
+    tier_priority = {
+        "verified_archive": 3,
+        "curated_feed": 2,
+        "directory_candidate": 1,
+    }
     ordered_items = sorted(
         unique_items.values(),
         key=lambda item: (
-            item.get("monitoring_classification", {}).get("discovery_tier")
-            == "curated_feed",
+            tier_priority.get(
+                str(
+                    item.get("monitoring_classification", {}).get(
+                        "discovery_tier"
+                    )
+                    or ""
+                ),
+                0,
+            ),
             str(item.get("published_at") or ""),
         ),
         reverse=True,

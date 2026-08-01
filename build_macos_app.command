@@ -42,6 +42,7 @@ fi
 mkdir -p "$RELEASE_DIR"
 rm -rf \
   "$WORK_DIR" \
+  "$DIST_DIR/.PodcastRadar-normalized.app" \
   "$DIST_DIR/$EXECUTABLE_NAME" \
   "$DIST_DIR/$EXECUTABLE_NAME.app" \
   "$DIST_DIR/$APP_BUNDLE" \
@@ -57,17 +58,21 @@ if [[ -f "$ICON_PATH" ]]; then
 fi
 "$RUNTIME_DIR/bin/python" -m PyInstaller --clean --noconfirm --windowed --onedir --distpath "$DIST_DIR" --workpath "$WORK_DIR" --name "$EXECUTABLE_NAME" --osx-bundle-identifier "com.shenqihao.ResearchPodcastRadar" --add-data "$ROOT_DIR/modules/person_monitor:modules/person_monitor" "${PYINSTALLER_ICON_ARGS[@]}" "$ROOT_DIR/main.py"
 
-if [[ -d "$DIST_DIR/$EXECUTABLE_NAME.app" ]]; then
-  GENERATED_APP_PATH="$DIST_DIR/$EXECUTABLE_NAME.app"
-elif [[ -d "$DIST_DIR/$EXECUTABLE_NAME/$EXECUTABLE_NAME.app" ]]; then
-  GENERATED_APP_PATH="$DIST_DIR/$EXECUTABLE_NAME/$EXECUTABLE_NAME.app"
-else
+GENERATED_PLIST_PATH="$(find "$DIST_DIR" -maxdepth 5 -type f -path '*/Contents/Info.plist' -print -quit)"
+if [[ -z "$GENERATED_PLIST_PATH" ]]; then
   echo "未检测到 PyInstaller 输出的应用包。"
   exit 1
 fi
+GENERATED_APP_PATH="${GENERATED_PLIST_PATH%/Contents/Info.plist}"
 
 APP_PATH="$DIST_DIR/$APP_BUNDLE"
-mv "$GENERATED_APP_PATH" "$APP_PATH"
+# PyInstaller 版本升级后可能把真正的 .app 再包在同名目录中。
+# 先归一化到临时路径，再改成对用户可见的应用名，避免产生嵌套 app。
+NORMALIZED_APP_PATH="$DIST_DIR/.PodcastRadar-normalized.app"
+rm -rf "$NORMALIZED_APP_PATH"
+ditto "$GENERATED_APP_PATH" "$NORMALIZED_APP_PATH"
+rm -rf "$APP_PATH"
+mv "$NORMALIZED_APP_PATH" "$APP_PATH"
 
 set_plist_value() {
   local plist_path=$1
@@ -131,6 +136,23 @@ cat > "$PACKAGE_DIR/update-manifest.json" <<EOF
   "release_date": "$(date +%Y-%m-%d)",
   "download_url": "https://github.com/qihaoshen857-ship-it/Podcast-Radar/releases/latest",
   "release_notes": [
+    "YouTube 音频下载恢复自动选择可用客户端，解决 web 客户端只返回分镜图而无可下载音频的问题。",
+    "底部刷新与任务进度条升级为圆角胶囊轨道，蓝色进度头不再显示生硬方块。",
+    "刷新时新增踩荧光滑板的像素小恐龙往返动画，腿部与滑板轮子带双帧动态。",
+    "下载、转录和整理任务中，小恐龙会跟随真实进度沿圆角蓝条前进。",
+    "今日雷达分类按钮新增明确选中态；切换 AI、AI创业、天气或养生后，当前按钮立即变黑。",
+    "栏目刷新期间新增顶部状态标识和流动进度条，成功、失败及本地缓存回退均有清晰提示。",
+    "今日雷达标题同步显示当前分类，避免把天气、AI 与综合雷达混淆。",
+    "人物监控卡片补齐真实节目封面，与今日雷达使用相同的圆角图片规格和本地缓存。",
+    "Apple Podcasts、RSS 单集/频道图片、YouTube 缩略图与访谈档案页图片按优先级自动回填。",
+    "封面后台并发下载，不阻塞人物页；图片不可用时保留 EM/DP 人物占位图。",
+    "人物监控页按今日雷达统一标题栏、人物切换、操作区、蓝色来源摘要与横向节目卡片。",
+    "移除人物页四块大指标卡，收录、信源、已核验档案和误报统计合并为紧凑摘要。",
+    "人物页按钮改用首页同款蓝色、黑色与白色圆角按钮，解决 macOS 原生灰色按钮割裂感。",
+    "人物监控页升级为首页同款圆角卡片、轻阴影、人物主题与分层来源标签。",
+    "Elon Musk 新增公开访谈档案源，补齐 The Economist、Hannity、SpaceX 技术访谈等最新内容。",
+    "马斯克访谈按已核验档案、优质固定源、目录候选分层排序，最新访谈优先显示。",
+    "新增“AI创业”独立雷达：聚焦创始人故事、0 到 1、获客与商业化，并过滤纯 AI 产业快讯。",
     "新增“极速云端”转录模式：长音频切片后默认 4 路并发调用阿里云 ASR。",
     "云端片段按原顺序合并，边界保留 1.5 秒重叠并自动去除重复文字。",
     "每个成功片段立即保存断点；云端失败时仅由本地 Whisper 补齐缺失片段。",
