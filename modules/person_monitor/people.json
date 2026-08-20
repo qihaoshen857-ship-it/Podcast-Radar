@@ -13,7 +13,7 @@
           "key": "dwarkesh-podcast-rss",
           "name": "Dwarkesh Podcast 官方 RSS",
           "kind": "podcast_rss",
-          "locator": "https://apple.dwarkesh-podcast.workers.dev/feed.rss",
+          "locator": "https://api.substack.com/feed/podcast/69345.rss",
           "expected_role": "guest_or_speaker",
           "query_aliases": ["Dylan Patel"]
         },
@@ -190,7 +190,7 @@
           "key": "elon-dwarkesh-podcast-rss",
           "name": "Dwarkesh Podcast 官方 RSS",
           "kind": "podcast_rss",
-          "locator": "https://apple.dwarkesh-podcast.workers.dev/feed.rss",
+          "locator": "https://api.substack.com/feed/podcast/69345.rss",
           "expected_role": "guest_or_speaker",
           "query_aliases": ["Elon Musk"]
         },

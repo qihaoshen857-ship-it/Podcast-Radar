@@ -17,16 +17,17 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from xml.etree import ElementTree as ET
 
 import requests
 
 EXPORT_SCHEMA_VERSION = "1.0.0"
-MODULE_VERSION = "0.3.1"
-PERSON_MONITOR_USER_AGENT = "PodcastRadar-PersonMonitor/0.3.1"
+MODULE_VERSION = "0.3.3"
+PERSON_MONITOR_USER_AGENT = "PodcastRadar-PersonMonitor/0.3.3"
 REQUEST_TIMEOUT = (10, 45)
+RefreshProgressCallback = Callable[[int, int, dict[str, Any]], None]
 TRACKING_QUERY_KEYS = {
     "fbclid",
     "gclid",
@@ -259,15 +260,45 @@ def _first_text(element: ET.Element, names: tuple[str, ...]) -> str:
 
 
 def _entry_link(element: ET.Element) -> str:
+    fallback = ""
     for child in element.iter():
         if _local_name(child.tag) != "link":
             continue
-        href = str(child.attrib.get("href") or "").strip()
-        if href:
-            return href
-        if child.text and child.text.strip():
-            return child.text.strip()
-    return ""
+        rel = str(child.attrib.get("rel") or "alternate").casefold()
+        media_type = str(child.attrib.get("type") or "").casefold()
+        href = str(child.attrib.get("href") or child.attrib.get("url") or "").strip()
+        value = href or (child.text.strip() if child.text and child.text.strip() else "")
+        if not value:
+            continue
+        if rel in {"alternate", ""} and not media_type.startswith("audio/"):
+            return value
+        if not fallback and rel != "enclosure" and not media_type.startswith("audio/"):
+            fallback = value
+    return fallback
+
+
+def _entry_audio_url(element: ET.Element) -> str:
+    fallback = ""
+    for child in element.iter():
+        local_name = _local_name(child.tag)
+        if local_name not in {"enclosure", "link", "content"}:
+            continue
+        rel = str(child.attrib.get("rel") or "").casefold()
+        media_type = str(child.attrib.get("type") or "").casefold()
+        medium = str(child.attrib.get("medium") or "").casefold()
+        url = str(
+            child.attrib.get("url")
+            or child.attrib.get("href")
+            or child.attrib.get("src")
+            or ""
+        ).strip()
+        if not url:
+            continue
+        if media_type.startswith("audio/") or medium == "audio" or rel == "enclosure":
+            return url
+        if local_name == "enclosure" and not media_type:
+            fallback = fallback or url
+    return fallback
 
 
 def _image_url_from_element(element: ET.Element) -> str:
@@ -337,6 +368,8 @@ def parse_feed_entries(content: bytes) -> tuple[str, list[dict[str, str]]]:
         description = _first_text(entry, ("description", "summary", "content"))
         published = _first_text(entry, ("pubdate", "published", "updated"))
         author = _first_text(entry, ("author", "creator")) or channel_title
+        audio_url = _entry_audio_url(entry)
+        duration = _first_text(entry, ("duration",))
         if title and (link or guid):
             parsed.append(
                 {
@@ -347,6 +380,8 @@ def parse_feed_entries(content: bytes) -> tuple[str, list[dict[str, str]]]:
                     "published": published,
                     "author": author,
                     "artwork_url": _entry_artwork_url(entry) or channel_artwork_url,
+                    "audio_url": audio_url,
+                    "duration": duration,
                 }
             )
     return channel_title, parsed
@@ -390,7 +425,7 @@ def discover_feed(
         candidate_hash = hashlib.sha256(provider_id.encode("utf-8")).hexdigest()[:24]
         items.append(
             {
-                "schema_version": "0.3.1",
+                "schema_version": "0.3.3",
                 "candidate_key": f"{source['key']}:{candidate_hash}",
                 "source_key": source["key"],
                 "provider_item_id": provider_id,
@@ -398,6 +433,10 @@ def discover_feed(
                 "title": entry["title"],
                 "author_or_channel": entry.get("author") or channel_title,
                 "artwork_url": entry.get("artwork_url", ""),
+                "audio_url": entry.get("audio_url", ""),
+                "duration_text": entry.get("duration", ""),
+                "description_text": entry.get("description", ""),
+                "source_type": "podcast_rss" if entry.get("audio_url") else "web",
                 "published_at": parse_publication_time(entry.get("published", "")),
                 "monitoring_classification": {
                     "person_slug": spec["slug"],
@@ -426,6 +465,18 @@ def discover_feed(
         },
     }
     return items, status
+
+
+def _format_milliseconds(value: Any) -> str:
+    try:
+        total_seconds = max(0, int(value) // 1000)
+    except (TypeError, ValueError):
+        return ""
+    hours, remainder = divmod(total_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    if hours:
+        return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+    return f"{minutes:02d}:{seconds:02d}"
 
 
 def discover_itunes_episodes(
@@ -516,7 +567,7 @@ def discover_itunes_episodes(
         candidate_hash = hashlib.sha256(provider_id.encode("utf-8")).hexdigest()[:24]
         items.append(
             {
-                "schema_version": "0.3.1",
+                "schema_version": "0.3.3",
                 "candidate_key": f"{source['key']}:{candidate_hash}",
                 "source_key": source["key"],
                 "provider_item_id": provider_id,
@@ -531,6 +582,15 @@ def discover_itunes_episodes(
                     or entry.get("artworkUrl60")
                     or ""
                 ).strip(),
+                "audio_url": str(entry.get("episodeUrl") or "").strip(),
+                "duration_text": _format_milliseconds(entry.get("trackTimeMillis")),
+                "description_text": str(
+                    entry.get("description")
+                    or entry.get("shortDescription")
+                    or entry.get("longDescription")
+                    or ""
+                ).strip(),
+                "source_type": "podcast_rss" if entry.get("episodeUrl") else "web",
                 "published_at": parse_publication_time(
                     str(entry.get("releaseDate") or "")
                 ),
@@ -674,12 +734,17 @@ def discover_elon_archive_interviews(
         published_at = parse_publication_time(str(entry.get("date") or ""))
         items.append(
             {
-                "schema_version": "0.3.1",
+                "schema_version": "0.3.3",
                 "candidate_key": f"{source['key']}:{provider_id}",
                 "source_key": source["key"],
                 "provider_item_id": provider_id,
                 "url": url,
                 "original_source_url": str(entry.get("source") or "").strip(),
+                "official_transcript_url": url,
+                "source_type": "verified_archive",
+                "description_text": str(
+                    entry.get("description") or entry.get("summary") or ""
+                ).strip(),
                 "title": title,
                 "author_or_channel": str(
                     entry.get("sourceLabel") or "Elon Musk Archive"
@@ -749,6 +814,7 @@ def refresh_person(
     *,
     max_items: int = 40,
     max_items_per_source: int = 12,
+    progress_callback: RefreshProgressCallback | None = None,
 ) -> dict[str, Any]:
     spec = person_spec(slug)
     previous = load_person_export(slug)
@@ -798,9 +864,16 @@ def refresh_person(
                 executor.submit(run_source, index, source)
                 for index, source in enumerate(configured_sources)
             ]
-            for future in as_completed(futures):
+            for completed_count, future in enumerate(as_completed(futures), start=1):
                 index, items, status = future.result()
                 indexed_results[index] = (items, status)
+                if progress_callback is not None:
+                    try:
+                        progress_callback(completed_count, len(futures), dict(status))
+                    except Exception:
+                        # A UI progress hook must never turn a successful source
+                        # refresh into a failed person-monitor run.
+                        pass
 
     statuses: list[dict[str, Any]] = []
     for index in range(len(configured_sources)):
@@ -813,6 +886,7 @@ def refresh_person(
     previous_items = [
         item for item in previous.get("items", []) if isinstance(item, dict)
     ]
+    previous_keys = {item_dedupe_key(item) for item in previous_items}
     current_item_count = len(all_items)
     all_items.extend(previous_items)
 
@@ -827,6 +901,7 @@ def refresh_person(
     ordered_items = sorted(
         unique_items.values(),
         key=lambda item: (
+            str(item.get("published_at") or ""),
             tier_priority.get(
                 str(
                     item.get("monitoring_classification", {}).get(
@@ -836,10 +911,12 @@ def refresh_person(
                 ),
                 0,
             ),
-            str(item.get("published_at") or ""),
         ),
         reverse=True,
     )[:max_items]
+    new_display_candidates = len(
+        {item_dedupe_key(item) for item in ordered_items} - previous_keys
+    )
 
     payload = empty_person_export(spec)
     payload.update(
@@ -854,6 +931,7 @@ def refresh_person(
                 "retained_history": len(previous_items),
                 "deduplicated_candidates": len(unique_items),
                 "display_limit": max_items,
+                "new_candidates": new_display_candidates,
             },
         }
     )

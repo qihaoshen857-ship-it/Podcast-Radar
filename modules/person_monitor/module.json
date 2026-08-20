@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0.0",
   "module_id": "person-monitor",
-  "module_version": "0.3.1",
+  "module_version": "0.3.3",
   "host_base_version": "0.4.33",
   "host_base_main_sha256": "6cfe05d66977764bfff4173e984e39987c60068360e042769bc85fdafa388c57",
   "source_snapshot": {

@@ -20,11 +20,24 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from difflib import SequenceMatcher
 from email.utils import parsedate_to_datetime
+from html.parser import HTMLParser
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 from urllib.parse import unquote, urlparse
 import tkinter as tk
 from xml.etree import ElementTree as ET
+
+# Conda's OpenSSL records its development-time certificate path. A frozen app
+# launched from /Applications must not reach back into Documents for that file,
+# otherwise macOS privacy checks can block startup before Tk creates a window.
+if getattr(sys, "frozen", False) and platform.system() == "Darwin":
+    system_ca_file = Path("/etc/ssl/cert.pem")
+    system_ca_dir = Path("/etc/ssl/certs")
+    if system_ca_file.exists():
+        os.environ.setdefault("SSL_CERT_FILE", str(system_ca_file))
+        os.environ.setdefault("REQUESTS_CA_BUNDLE", str(system_ca_file))
+    if system_ca_dir.exists():
+        os.environ.setdefault("SSL_CERT_DIR", str(system_ca_dir))
 
 import requests
 from requests.adapters import HTTPAdapter
@@ -64,7 +77,7 @@ from app.transcription import (
 
 
 APP_NAME = "Podcast Radar"
-APP_VERSION = "0.4.36"
+APP_VERSION = "0.4.42"
 TRANSCRIPTION_MODE_OPTIONS = {
     "本地优先": "local_first",
     "极速云端": "cloud_fast",
@@ -340,7 +353,7 @@ YOUTUBE_EPISODES_PER_SOURCE = 3
 XIAOYUZHOU_EPISODES_PER_SOURCE = 3
 MAX_RSS_ENTRIES_PER_FEED = 160
 AUTO_FETCH_DELAY_MS = 250
-CARD_TRANSLATION_VISIBLE_LIMIT = 24
+CARD_TRANSLATION_VISIBLE_LIMIT = AI_DISCOVERY_LIMIT
 CARD_WIDTH = 196
 CARD_HEIGHT = 376
 CARD_INNER_WIDTH = 174
@@ -660,6 +673,162 @@ class VideoItem:
     available: bool = True
     status: str = "未开始"
     progress: str = "-"
+    official_transcript_url: str = ""
+    topic: str = ""
+
+
+def person_monitor_video_item(record: dict, person_name: str = "") -> VideoItem:
+    """Convert an isolated person-monitor candidate into the host media model."""
+
+    candidate_key = str(
+        record.get("candidate_key")
+        or record.get("provider_item_id")
+        or record.get("url")
+        or record.get("title")
+        or "person-monitor-item"
+    )
+    video_id = "person-" + hashlib.sha1(candidate_key.encode("utf-8")).hexdigest()[:16]
+    page_url = str(record.get("url") or "").strip()
+    original_source_url = str(record.get("original_source_url") or "").strip()
+    audio_url = str(record.get("audio_url") or "").strip()
+    official_transcript_url = str(record.get("official_transcript_url") or "").strip()
+    classification = record.get("monitoring_classification")
+    if not isinstance(classification, dict):
+        classification = {}
+    tier = str(classification.get("discovery_tier") or "")
+
+    media_url = original_source_url or page_url
+    source_type = str(record.get("source_type") or "").strip()
+    media_host = urlparse(media_url).netloc.casefold()
+    is_youtube = media_host in {"youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"}
+    if audio_url:
+        source_type = "podcast_rss"
+    elif is_youtube:
+        source_type = "youtube"
+    elif not source_type or source_type == "verified_archive":
+        source_type = "web"
+    if tier == "verified_archive":
+        official_transcript_url = official_transcript_url or page_url
+
+    published_at = parse_podcast_datetime(str(record.get("published_at") or ""))
+    published_text = (
+        published_at.astimezone().strftime("%Y-%m-%d")
+        if published_at
+        else str(record.get("published_at") or "")[:10]
+    )
+    return VideoItem(
+        video_id=video_id,
+        title=str(record.get("title") or "未命名人物访谈").strip(),
+        duration_text=str(record.get("duration_text") or "-").strip() or "-",
+        webpage_url=media_url,
+        source_type=source_type,
+        audio_url=audio_url,
+        source_name=str(
+            record.get("author_or_channel")
+            or record.get("source_key")
+            or person_name
+            or "人物监控"
+        ).strip(),
+        published_text=published_text,
+        artwork_url=str(record.get("artwork_url") or "").strip(),
+        description_text=strip_html_text(str(record.get("description_text") or "")),
+        available=bool(audio_url or is_youtube or official_transcript_url),
+        official_transcript_url=official_transcript_url,
+        topic=f"人物访谈：{person_name}" if person_name else "人物访谈",
+    )
+
+
+class ElonArchiveTranscriptParser(HTMLParser):
+    """Extract speaker-labelled transcript blocks from an archive page."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.transcript_started = False
+        self._heading_depth = 0
+        self._heading_parts: list[str] = []
+        self._speaker_depth = 0
+        self._speaker_parts: list[str] = []
+        self._button_depth = 0
+        self._button_parts: list[str] = []
+        self.current_speaker = ""
+        self.blocks: list[tuple[str, str]] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        attributes = {key: value or "" for key, value in attrs}
+        if tag == "h2" and not self.transcript_started:
+            self._heading_depth = 1
+            self._heading_parts = []
+            return
+        if self._heading_depth:
+            self._heading_depth += 1
+            return
+        if not self.transcript_started:
+            return
+        class_names = set(attributes.get("class", "").split())
+        if tag == "div" and {"font-semibold", "text-accent"}.issubset(class_names):
+            self._speaker_depth = 1
+            self._speaker_parts = []
+            return
+        if self._speaker_depth:
+            self._speaker_depth += 1
+            return
+        if tag == "button" and attributes.get("aria-label") == "Play from here":
+            self._button_depth = 1
+            self._button_parts = []
+            return
+        if self._button_depth:
+            self._button_depth += 1
+
+    def handle_endtag(self, tag: str) -> None:
+        del tag
+        if self._heading_depth:
+            self._heading_depth -= 1
+            if self._heading_depth == 0:
+                heading = " ".join(self._heading_parts).strip().casefold()
+                self.transcript_started = heading == "transcript"
+            return
+        if self._speaker_depth:
+            self._speaker_depth -= 1
+            if self._speaker_depth == 0:
+                self.current_speaker = re.sub(r"\s+", " ", " ".join(self._speaker_parts)).strip()
+            return
+        if self._button_depth:
+            self._button_depth -= 1
+            if self._button_depth == 0:
+                content = re.sub(r"\s+", " ", "".join(self._button_parts)).strip()
+                if content:
+                    self.blocks.append((self.current_speaker, content))
+
+    def handle_data(self, data: str) -> None:
+        if self._heading_depth:
+            self._heading_parts.append(data)
+        elif self._speaker_depth:
+            self._speaker_parts.append(data)
+        elif self._button_depth:
+            self._button_parts.append(data)
+
+
+def extract_elon_archive_transcript_html(item: VideoItem, page_html: str) -> str:
+    parser = ElonArchiveTranscriptParser()
+    parser.feed(page_html or "")
+    if not parser.blocks:
+        return ""
+    lines = [
+        f"# {item.title} — Full Transcript",
+        "",
+        f"Source: {item.source_name or 'Elon Musk Archive'}",
+        f"Published: {item.published_text or 'Unknown'}",
+        "",
+        "## Transcript",
+        "",
+    ]
+    last_speaker = ""
+    for speaker, content in parser.blocks:
+        if speaker and speaker != last_speaker:
+            lines.extend([f"### {speaker}", ""])
+            last_speaker = speaker
+        lines.extend([content, ""])
+    return "\n".join(lines).strip() + "\n"
 
 
 TRANSCRIPT_HEADING_PATTERN = re.compile(
@@ -1040,11 +1209,30 @@ INVESTMENT_KEYWORDS: tuple[tuple[tuple[str, ...], float, str], ...] = (
     (("startup", "funding", "valuation", "ipo", "m&a", "acquisition"), 0.8, "一级/并购信号"),
     (("corn", "soy", "soybean", "wheat", "grain", "cotton", "sugar", "coffee", "cocoa", "rice"), 1.0, "农产品"),
     (("wasde", "usda", "export", "exports", "inventory", "stocks", "yield", "planting"), 1.1, "供需数据"),
-    (("el nino", "el niño", "la nina", "la niña", "enso", "drought", "rainfall", "heat", "flood"), 1.2, "天气扰动"),
+    (("drought", "rainfall", "heat", "flood", "干旱", "降雨", "高温", "洪水"), 1.2, "天气扰动"),
     (("brazil", "argentina", "china", "india", "black sea", "ukraine", "russia"), 0.8, "关键产区/贸易"),
     (("fertilizer", "potash", "phosphate", "urea", "ethanol", "diesel", "freight"), 0.8, "农化/成本"),
     (("longevity", "obesity", "glp-1", "sleep", "metabolic", "nutrition", "protein"), 0.7, "健康消费/医药"),
 )
+
+ENSO_PRIORITY_KEYWORDS: tuple[str, ...] = (
+    "el nino",
+    "el niño",
+    "elnino",
+    "la nina",
+    "la niña",
+    "enso",
+    "nino 3.4",
+    "niño 3.4",
+    "nino3.4",
+    "niño3.4",
+    "oceanic niño index",
+    "oceanic nino index",
+    "厄尔尼诺",
+    "拉尼娜",
+    "南方涛动",
+)
+ENSO_WEATHER_BONUS = 2.3
 
 
 def format_duration(seconds) -> str:
@@ -1107,6 +1295,18 @@ def format_file_size(value: int) -> str:
             return f"{size:.1f} {unit}"
         size /= 1024
     return f"{size:.1f} GB"
+
+
+def preferred_record_title(record: dict | None, fallback: str = "") -> str:
+    """Prefer a cached Chinese title while retaining a safe original-title fallback."""
+    if isinstance(record, dict):
+        translated = str(record.get("title_zh") or "").strip()
+        if translated and contains_cjk(translated):
+            return translated
+        original = str(record.get("title") or "").strip()
+        if original:
+            return original
+    return str(fallback or "").strip()
 
 
 def extract_count_from_mapping(data: dict | None) -> int | None:
@@ -1295,6 +1495,10 @@ def investment_value_score(item: VideoItem) -> tuple[float, list[str]]:
     if keyword_hits:
         score += min(3.0, keyword_bonus)
         reasons.extend(keyword_hits[:3])
+
+    if topic == "weather_agri" and text_matches_any_keyword(text, ENSO_PRIORITY_KEYWORDS):
+        score += ENSO_WEATHER_BONUS
+        reasons.append("厄尔尼诺/ENSO 重点")
 
     priority = FEED_PRIORITY_BY_NAME.get(item.source_name)
     if priority is not None:
@@ -1568,6 +1772,188 @@ def default_browser_cookie_mode() -> str:
     return modes[0] if modes else "none"
 
 
+@dataclass(frozen=True)
+class ReaderMarkdownBlock:
+    kind: str
+    text: str = ""
+    marker: str = ""
+    depth: int = 0
+
+
+READER_LIST_PATTERN = re.compile(r"^([ \t]*)([-*+]\s+|\d+[.)]\s+)(.*)$")
+READER_META_PREFIXES = (
+    "标题 /",
+    "来源 /",
+    "发布时间 /",
+    "链接 /",
+    "Title:",
+    "Source:",
+    "Published:",
+    "Link:",
+)
+
+
+def reader_indent_depth(prefix: str) -> int:
+    spaces = len(prefix.expandtabs(4))
+    return max(0, min(3, (spaces + 2) // 4))
+
+
+def parse_reader_markdown(markdown_text: str) -> list[ReaderMarkdownBlock]:
+    """Parse the Markdown subset used by research notes into stable reading blocks."""
+    blocks: list[ReaderMarkdownBlock] = []
+    in_fence = False
+
+    def append_spacer() -> None:
+        if blocks and blocks[-1].kind != "spacer":
+            blocks.append(ReaderMarkdownBlock("spacer"))
+
+    def append_paragraph(kind: str, text: str) -> None:
+        if blocks and blocks[-1].kind == kind:
+            previous = blocks[-1]
+            blocks[-1] = ReaderMarkdownBlock(kind, f"{previous.text} {text}".strip())
+        else:
+            blocks.append(ReaderMarkdownBlock(kind, text))
+
+    for raw_line in markdown_text.replace("\r\n", "\n").replace("\r", "\n").splitlines():
+        line = raw_line.rstrip()
+        stripped = line.strip()
+        if stripped.startswith("```"):
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            append_paragraph("body", stripped)
+            continue
+        if not stripped:
+            append_spacer()
+            continue
+        if stripped.startswith("### "):
+            blocks.append(ReaderMarkdownBlock("h3", stripped[4:].strip()))
+            continue
+        if stripped.startswith("## "):
+            blocks.append(ReaderMarkdownBlock("h2", stripped[3:].strip()))
+            continue
+        if stripped.startswith("# "):
+            blocks.append(ReaderMarkdownBlock("h1", stripped[2:].strip()))
+            continue
+        if stripped.startswith(">"):
+            append_paragraph("quote", stripped.lstrip("> ").strip())
+            continue
+
+        list_match = READER_LIST_PATTERN.match(line)
+        if list_match:
+            prefix, marker, content = list_match.groups()
+            blocks.append(
+                ReaderMarkdownBlock(
+                    "list",
+                    content.strip(),
+                    marker.strip(),
+                    reader_indent_depth(prefix),
+                )
+            )
+            continue
+
+        if line[:1].isspace() and blocks and blocks[-1].kind == "list":
+            previous = blocks[-1]
+            blocks[-1] = ReaderMarkdownBlock(
+                "list",
+                f"{previous.text} {stripped}".strip(),
+                previous.marker,
+                previous.depth,
+            )
+            continue
+
+        kind = "meta" if stripped.startswith(READER_META_PREFIXES) else "body"
+        append_paragraph(kind, stripped)
+
+    while blocks and blocks[-1].kind == "spacer":
+        blocks.pop()
+    return blocks
+
+
+def limit_markdown_section_items(lines: list[str], limit: int = 3) -> list[str]:
+    """Keep at most `limit` top-level Markdown list items and their continuations."""
+    list_rows: list[tuple[int, re.Match[str]]] = []
+    for index, line in enumerate(lines):
+        match = READER_LIST_PATTERN.match(line.rstrip())
+        if match:
+            list_rows.append((index, match))
+    if not list_rows:
+        paragraphs: list[list[str]] = []
+        current: list[str] = []
+        for line in lines:
+            if line.strip():
+                current.append(line)
+            elif current:
+                paragraphs.append(current)
+                current = []
+        if current:
+            paragraphs.append(current)
+        return [line for paragraph in paragraphs[:limit] for line in (*paragraph, "")][:-1]
+
+    top_spaces = min(len(match.group(1).expandtabs(4)) for _index, match in list_rows)
+    output: list[str] = []
+    item_count = 0
+    keep_current = True
+    for line in lines:
+        match = READER_LIST_PATTERN.match(line.rstrip())
+        if match and len(match.group(1).expandtabs(4)) == top_spaces:
+            item_count += 1
+            keep_current = item_count <= limit
+        if keep_current:
+            output.append(line)
+    while output and not output[-1].strip():
+        output.pop()
+    return output
+
+
+def strip_legacy_reader_verdict_prefix(lines: list[str]) -> list[str]:
+    pattern = re.compile(
+        r"^(\s*(?:[-*+]\s+|\d+[.)]\s+)?)"
+        r"(?:\*\*)?(?:值得(?:继续)?深(?:听|读)|快速浏览|可以跳过)(?:\*\*)?\s*[：:]\s*"
+    )
+    result = list(lines)
+    for index, line in enumerate(result):
+        if not line.strip():
+            continue
+        result[index] = pattern.sub(r"\1", line, count=1)
+        break
+    return result
+
+
+def normalize_research_digest_markdown(markdown_text: str) -> str:
+    """Apply v0.4.37 reading rules to new and legacy research digests."""
+    sections: list[tuple[str | None, list[str]]] = [(None, [])]
+    for line in markdown_text.replace("\r\n", "\n").replace("\r", "\n").splitlines():
+        heading = re.match(r"^##\s+(.+?)\s*$", line.strip())
+        if heading:
+            sections.append((heading.group(1).strip(), []))
+        else:
+            sections[-1][1].append(line)
+
+    output: list[str] = []
+    for title, lines in sections:
+        if title is None:
+            output.extend(lines)
+            continue
+        normalized_title = title.rstrip(" ")
+        if normalized_title in {"与我的研究相关", "与我研究相关", "与研究相关"}:
+            continue
+        if normalized_title == "一句话判断":
+            normalized_title = "全文主线"
+            lines = strip_legacy_reader_verdict_prefix(lines)
+        elif normalized_title in {"可继续跟踪的问题", "可持续追踪的问题", "持续跟踪问题"}:
+            normalized_title = "后续追踪"
+            lines = limit_markdown_section_items(lines, 3)
+        elif normalized_title == "后续追踪":
+            lines = limit_markdown_section_items(lines, 3)
+        if output and output[-1].strip():
+            output.append("")
+        output.append(f"## {normalized_title}")
+        output.extend(lines)
+
+    return "\n".join(output).strip() + "\n"
+
+
 def create_rounded_rect(
     canvas: tk.Canvas,
     x1: int,
@@ -1605,6 +1991,69 @@ def create_rounded_rect(
         y1,
     ]
     return canvas.create_polygon(points, smooth=True, splinesteps=16, **kwargs)
+
+
+class RoundedPanel(tk.Canvas):
+    """A rounded canvas shell that hosts regular Tk widgets inside its content frame."""
+
+    def __init__(
+        self,
+        parent: tk.Misc,
+        *,
+        fill: str = COLOR_SURFACE,
+        outline: str = COLOR_BORDER,
+        outer_bg: str = COLOR_BG,
+        radius: int = 16,
+        inset_x: int = 10,
+        inset_y: int = 8,
+        height: int = 1,
+    ) -> None:
+        super().__init__(
+            parent,
+            bg=outer_bg,
+            height=height,
+            highlightthickness=0,
+            bd=0,
+            relief="flat",
+        )
+        self._fill = fill
+        self._outline = outline
+        self._radius = radius
+        self._inset_x = inset_x
+        self._inset_y = inset_y
+        self._panel_shape: int | None = None
+        self.content = tk.Frame(self, bg=fill, bd=0, highlightthickness=0)
+        self._content_window = self.create_window(
+            inset_x,
+            inset_y,
+            anchor="nw",
+            window=self.content,
+        )
+        self.bind("<Configure>", self._redraw)
+
+    def _redraw(self, _event: tk.Event | None = None) -> None:
+        width = max(4, self.winfo_width())
+        height = max(4, self.winfo_height())
+        if self._panel_shape is not None:
+            self.delete(self._panel_shape)
+        self._panel_shape = create_rounded_rect(
+            self,
+            1,
+            1,
+            width - 1,
+            height - 1,
+            self._radius,
+            fill=self._fill,
+            outline=self._outline,
+            width=1,
+        )
+        self.tag_lower(self._panel_shape)
+        self.coords(self._content_window, self._inset_x, self._inset_y)
+        self.itemconfigure(
+            self._content_window,
+            width=max(1, width - self._inset_x * 2),
+            height=max(1, height - self._inset_y * 2),
+        )
 
 
 PIXEL_DINO_FRAMES: tuple[tuple[str, ...], ...] = (
@@ -2020,10 +2469,12 @@ class YTAudioDownloaderApp:
         self.transcribing = False
         self.transcription_stop_requested = False
         self.auto_digests_running = False
+        self.library_title_translation_running = False
         self.full_translation_inflight: dict[str, dict[str, object]] = {}
         self.translation_request_serial = 0
         self.latest_translation_request_id = 0
         self.reader_navigation_serial = 0
+        self.reader_translation_progress_hide_job: str | None = None
         self.transcription_paths: list[Path] = []
         self.transcription_rows: dict[Path, str] = {}
         self.transcription_statuses: dict[Path, str] = {}
@@ -2087,6 +2538,8 @@ class YTAudioDownloaderApp:
         self.reader_current_result_type = ""
         self.reader_translation_source_path: Path | None = None
         self.reader_translation_status_var = tk.StringVar(value="中文全文：打开英文转录后可按需生成")
+        self.reader_translation_progress_value = tk.DoubleVar(value=0)
+        self.reader_translation_progress_label_var = tk.StringVar(value="准备中")
         self.reader_tts_audio_path: Path | None = None
         self.reader_tts_source_path: Path | None = None
         self.reader_tts_scope = ""
@@ -2606,6 +3059,7 @@ class YTAudioDownloaderApp:
                 self.person_monitor_page.on_show()
             elif page_key == "results":
                 self.ensure_results_current()
+                self.ensure_library_title_translations()
             else:
                 self.schedule_visible_page_flush(delay_ms=0)
             return
@@ -2619,6 +3073,7 @@ class YTAudioDownloaderApp:
         self.schedule_visible_page_flush(delay_ms=45)
         if page_key == "results":
             self.root.after(45, self.ensure_results_current)
+            self.root.after(90, self.ensure_library_title_translations)
         elif page_key == "person_monitor":
             self.root.after(45, self.person_monitor_page.on_show)
 
@@ -4285,46 +4740,54 @@ class YTAudioDownloaderApp:
             font=(FONT_UI, 11),
             underline=True,
         )
+        self.configure_markdown_list_tags(
+            text_widget,
+            font_size=12,
+            left_margin=18,
+            right_margin=12,
+            spacing=5,
+        )
+
+    def configure_markdown_list_tags(
+        self,
+        text_widget: tk.Text,
+        *,
+        font_size: int,
+        left_margin: int,
+        right_margin: int,
+        spacing: int,
+    ) -> None:
+        for depth in range(4):
+            first_margin = left_margin + depth * 24
+            text_widget.tag_configure(
+                f"list{depth}",
+                foreground=COLOR_TEXT,
+                font=(FONT_UI, font_size),
+                lmargin1=first_margin,
+                lmargin2=first_margin + 28,
+                rmargin=right_margin,
+                spacing2=4,
+                spacing3=spacing,
+            )
 
     def insert_rendered_markdown(self, text_widget: tk.Text, markdown_text: str) -> None:
-        for raw_line in markdown_text.splitlines():
-            line = raw_line.rstrip()
-            stripped = line.strip()
-            if stripped.startswith("```"):
-                continue
-            if not stripped:
+        for block in parse_reader_markdown(markdown_text):
+            if block.kind == "spacer":
                 text_widget.insert("end", "\n", ("body",))
                 continue
-            if stripped.startswith("# "):
-                text_widget.insert("end", stripped[2:].strip() + "\n", ("h1",))
+            if block.kind in {"h1", "h2", "h3"}:
+                text_widget.insert("end", block.text + "\n", (block.kind,))
                 continue
-            if stripped.startswith("## "):
-                text_widget.insert("end", stripped[3:].strip() + "\n", ("h2",))
+            if block.kind == "list":
+                list_tag = f"list{max(0, min(3, block.depth))}"
+                marker = "•" if block.marker in {"-", "*", "+"} else block.marker
+                text_widget.insert("end", marker + " ", (list_tag, "bold"))
+                self.insert_markdown_inline(text_widget, block.text, list_tag)
+                text_widget.insert("end", "\n", (list_tag,))
                 continue
-            if stripped.startswith("### "):
-                text_widget.insert("end", stripped[4:].strip() + "\n", ("h3",))
-                continue
-            if stripped.startswith(">"):
-                self.insert_markdown_inline(text_widget, stripped.lstrip("> ").strip(), "quote")
-                text_widget.insert("end", "\n", ("quote",))
-                continue
-            if stripped.startswith(("- ", "* ")):
-                text_widget.insert("end", "• ", ("bullet",))
-                self.insert_markdown_inline(text_widget, stripped[2:].strip(), "bullet")
-                text_widget.insert("end", "\n", ("bullet",))
-                continue
-            numbered = re.match(r"^(\d+\.)\s+(.*)$", stripped)
-            if numbered:
-                text_widget.insert("end", numbered.group(1) + " ", ("bullet", "bold"))
-                self.insert_markdown_inline(text_widget, numbered.group(2), "bullet")
-                text_widget.insert("end", "\n", ("bullet",))
-                continue
-            if stripped.startswith(("标题 /", "来源 /", "发布时间 /", "链接 /", "Title:", "Source:", "Published:", "Link:")):
-                self.insert_markdown_inline(text_widget, stripped, "meta")
-                text_widget.insert("end", "\n", ("meta",))
-                continue
-            self.insert_markdown_inline(text_widget, stripped, "body")
-            text_widget.insert("end", "\n", ("body",))
+            base_tag = block.kind if block.kind in {"quote", "meta"} else "body"
+            self.insert_markdown_inline(text_widget, block.text, base_tag)
+            text_widget.insert("end", "\n", (base_tag,))
 
     def insert_markdown_inline(self, text_widget: tk.Text, text: str, base_tag: str) -> None:
         cursor = 0
@@ -4615,7 +5078,8 @@ class YTAudioDownloaderApp:
     def card_translated_title(self, item: VideoItem) -> str:
         record = self.research_library.get("items", {}).get(item.video_id, {})
         if isinstance(record, dict):
-            return str(record.get("title_zh") or "").strip()
+            translated = str(record.get("title_zh") or "").strip()
+            return translated if contains_cjk(translated) else ""
         return ""
 
     def card_translated_summary(self, item: VideoItem) -> str:
@@ -4699,6 +5163,83 @@ class YTAudioDownloaderApp:
         except Exception as exc:  # noqa: BLE001
             self.events.put(("card_titles_error", f"卡片标题翻译失败：{exc}"))
 
+    def ensure_library_title_translations(self) -> None:
+        if self.library_title_translation_running:
+            return
+        api_key = self.api_key_var.get().strip()
+        if not api_key:
+            return
+        records = self.research_library.get("items", {})
+        if not isinstance(records, dict):
+            return
+        result_fields = (
+            "digest_path",
+            "transcript_path",
+            "full_translation_path",
+            "tts_audio_path",
+            "full_translation_tts_audio_path",
+        )
+        targets: list[tuple[str, str]] = []
+        for record_key, record in records.items():
+            if not isinstance(record, dict):
+                continue
+            title = str(record.get("title") or "").strip()
+            cached_title = str(record.get("title_zh") or "").strip()
+            if not title or contains_cjk(title) or contains_cjk(cached_title):
+                continue
+            if not any(str(record.get(field) or "").strip() for field in result_fields):
+                continue
+            targets.append((str(record_key), title))
+            if len(targets) >= 160:
+                break
+        if not targets:
+            return
+        self.library_title_translation_running = True
+        self.set_status(f"正在后台汉化资料库中的 {len(targets)} 个英文标题...")
+        threading.Thread(
+            target=self.library_title_translation_worker,
+            args=(targets, api_key),
+            daemon=True,
+        ).start()
+
+    def library_title_translation_worker(
+        self,
+        targets: list[tuple[str, str]],
+        api_key: str,
+    ) -> None:
+        try:
+            translated_by_key: dict[str, str] = {}
+            batch_size = 24
+            for start in range(0, len(targets), batch_size):
+                batch = targets[start : start + batch_size]
+                translated_titles = translate_episode_titles([title for _key, title in batch], api_key)
+                for (record_key, original_title), translated_title in zip(batch, translated_titles):
+                    cleaned = str(translated_title or "").strip()
+                    if cleaned and contains_cjk(cleaned):
+                        translated_by_key[record_key] = cleaned
+            self.events.put(("library_titles_ready", translated_by_key))
+        except Exception as exc:  # noqa: BLE001
+            self.events.put(("library_titles_error", f"资料库标题汉化失败：{exc}"))
+
+    def apply_library_title_translations(self, translations: dict[str, str]) -> None:
+        self.library_title_translation_running = False
+        records = self.research_library.setdefault("items", {})
+        updated = 0
+        for record_key, title_zh in translations.items():
+            record = records.get(record_key)
+            translated = str(title_zh or "").strip()
+            if not isinstance(record, dict) or not translated:
+                continue
+            record["title_zh"] = translated
+            record["title_zh_updated_at"] = datetime.now(timezone.utc).isoformat()
+            updated += 1
+        if not updated:
+            self.set_status("资料库英文标题暂未获得可用中文翻译")
+            return
+        self.save_research_library()
+        self.mark_results_dirty(refresh_visible=True)
+        self.set_status(f"资料库标题汉化已更新 {updated} 条")
+
     def card_summary_translation_worker(self, items: list[VideoItem], api_key: str) -> None:
         try:
             batch_size = 16
@@ -4730,6 +5271,7 @@ class YTAudioDownloaderApp:
 
     def apply_card_title_translations(self, translations: dict) -> None:
         records = self.research_library.setdefault("items", {})
+        updated = 0
         for video_id, title_zh in translations.items():
             item = self.video_map.get(video_id)
             if not item or not str(title_zh).strip():
@@ -4744,8 +5286,11 @@ class YTAudioDownloaderApp:
             record["title_zh_updated_at"] = datetime.now(timezone.utc).isoformat()
             records[video_id] = record
             self.refresh_card_visual_or_defer(video_id)
-        self.save_research_library()
-        self.set_status("卡片标题中文翻译已更新")
+            updated += 1
+        if updated:
+            self.save_research_library()
+            self.mark_results_dirty(refresh_visible=True)
+            self.set_status("卡片标题中文翻译已更新")
 
     def apply_card_summary_translations(self, translations: dict) -> None:
         records = self.research_library.setdefault("items", {})
@@ -4848,7 +5393,7 @@ class YTAudioDownloaderApp:
         self.transcription_log_text.pack(fill="both", expand=True)
 
     def build_reader_tab(self, parent: tk.Frame) -> None:
-        shell = tk.Frame(parent, bg=COLOR_BG, padx=24, pady=18)
+        shell = tk.Frame(parent, bg=COLOR_BG, padx=24, pady=14)
         shell.pack(fill="both", expand=True)
 
         header = tk.Frame(shell, bg=COLOR_BG)
@@ -4858,7 +5403,7 @@ class YTAudioDownloaderApp:
             textvariable=self.reader_title_var,
             fg=COLOR_TEXT,
             bg=COLOR_BG,
-            font=(FONT_DISPLAY, 22, "bold"),
+            font=(FONT_DISPLAY, 21, "bold"),
             anchor="w",
             justify="left",
         ).pack(side="left", fill="x", expand=True)
@@ -4866,12 +5411,19 @@ class YTAudioDownloaderApp:
         self.ui_button(header, "外部打开", self.open_reader_current_path, variant="secondary", padx=12, pady=6).pack(side="right", padx=(8, 0))
         self.ui_button(header, "所在文件夹", self.reveal_reader_current_path, variant="secondary", padx=12, pady=6).pack(side="right", padx=(8, 0))
 
-        self.ui_label(shell, textvariable=self.reader_meta_var, fg=COLOR_BLUE, bg=COLOR_BG).pack(anchor="w", pady=(8, 0))
-        path_label = self.ui_label(shell, textvariable=self.reader_path_var, fg=COLOR_MUTED, bg=COLOR_BG)
-        path_label.pack(anchor="w", pady=(2, 10))
+        self.ui_label(shell, textvariable=self.reader_meta_var, fg=COLOR_BLUE, bg=COLOR_BG).pack(anchor="w", pady=(7, 9))
 
-        translation_bar = tk.Frame(shell, bg="#eef6ff", padx=12, pady=9)
-        translation_bar.pack(fill="x", pady=(0, 8))
+        translation_panel = RoundedPanel(
+            shell,
+            fill="#eef6ff",
+            outline="#cfe4fb",
+            radius=14,
+            inset_x=12,
+            inset_y=6,
+            height=48,
+        )
+        translation_panel.pack(fill="x", pady=(0, 6))
+        translation_bar = translation_panel.content
         self.ui_label(
             translation_bar,
             textvariable=self.reader_translation_status_var,
@@ -4904,8 +5456,43 @@ class YTAudioDownloaderApp:
             pady=5,
         ).pack(side="right", padx=(8, 0))
 
-        tts_bar = tk.Frame(shell, bg=COLOR_SURFACE_ALT, padx=12, pady=9)
-        tts_bar.pack(fill="x", pady=(0, 10))
+        self.reader_translation_bar = translation_panel
+        self.reader_translation_progress_frame = RoundedPanel(
+            shell,
+            fill="#eef6ff",
+            outline="#cfe4fb",
+            radius=14,
+            inset_x=12,
+            inset_y=4,
+            height=42,
+        )
+        translation_progress_content = self.reader_translation_progress_frame.content
+        self.reader_translation_progress_bar = RoundedDinoProgressBar(
+            translation_progress_content,
+            variable=self.reader_translation_progress_value,
+            maximum=100,
+            bg="#eef6ff",
+        )
+        self.reader_translation_progress_bar.pack(side="left", fill="x", expand=True)
+        self.ui_label(
+            translation_progress_content,
+            textvariable=self.reader_translation_progress_label_var,
+            fg=COLOR_BLUE_DARK,
+            bg="#eef6ff",
+            weight="bold",
+        ).pack(side="left", padx=(10, 0))
+
+        tts_panel = RoundedPanel(
+            shell,
+            fill=COLOR_SURFACE_ALT,
+            outline=COLOR_BORDER,
+            radius=14,
+            inset_x=12,
+            inset_y=6,
+            height=48,
+        )
+        tts_panel.pack(fill="x", pady=(0, 7))
+        tts_bar = tts_panel.content
         self.ui_label(
             tts_bar,
             textvariable=self.tts_status_var,
@@ -4918,8 +5505,29 @@ class YTAudioDownloaderApp:
         self.ui_button(tts_bar, "朗读当前页", self.generate_reader_tts_current, variant="accent", padx=10, pady=5).pack(side="right", padx=(8, 0))
         self.ui_button(tts_bar, "朗读选中", self.generate_reader_tts_selected, variant="success", padx=10, pady=5).pack(side="right", padx=(8, 0))
 
-        body = tk.Frame(shell, bg=COLOR_SURFACE, padx=0, pady=0)
-        body.pack(fill="both", expand=True)
+        reader_nav = tk.Frame(shell, bg=COLOR_BG)
+        reader_nav.pack(fill="x", pady=(0, 7))
+        self.ui_label(reader_nav, text="页内导航", fg=COLOR_MUTED, bg=COLOR_BG, weight="bold").pack(side="left", padx=(2, 8))
+        for heading in ("全文主线", "核心要点", "关键数据与案例", "中文整理稿", "后续追踪"):
+            self.ui_button(
+                reader_nav,
+                heading,
+                lambda target=heading: self.jump_reader_heading(target),
+                variant="secondary",
+                padx=9,
+                pady=4,
+            ).pack(side="left", padx=(0, 6))
+
+        body_panel = RoundedPanel(
+            shell,
+            fill=COLOR_SURFACE,
+            outline=COLOR_BORDER,
+            radius=18,
+            inset_x=10,
+            inset_y=8,
+        )
+        body_panel.pack(fill="both", expand=True)
+        body = body_panel.content
         self.reader_text = tk.Text(
             body,
             wrap="word",
@@ -4928,21 +5536,32 @@ class YTAudioDownloaderApp:
             fg=COLOR_TEXT,
             insertbackground=COLOR_TEXT,
             relief="flat",
-            padx=22,
-            pady=18,
-            font=(FONT_UI, 12),
+            borderwidth=0,
+            highlightthickness=0,
+            padx=8,
+            pady=16,
+            font=(FONT_UI, 13),
         )
-        self.reader_text.tag_configure("heading", foreground=COLOR_TEXT, font=(FONT_DISPLAY, 16, "bold"), spacing1=10, spacing3=6)
-        self.reader_text.tag_configure("h1", foreground=COLOR_TEXT, font=(FONT_DISPLAY, 19, "bold"), spacing1=12, spacing3=8)
-        self.reader_text.tag_configure("h2", foreground=COLOR_TEXT, font=(FONT_DISPLAY, 16, "bold"), spacing1=12, spacing3=6)
-        self.reader_text.tag_configure("h3", foreground=COLOR_TEXT, font=(FONT_DISPLAY, 14, "bold"), spacing1=10, spacing3=5)
-        self.reader_text.tag_configure("body", foreground=COLOR_TEXT, font=(FONT_UI, 12), spacing3=4)
-        self.reader_text.tag_configure("bold", font=(FONT_UI, 12, "bold"))
-        self.reader_text.tag_configure("quote", foreground=COLOR_MUTED, font=(FONT_UI, 11), lmargin1=18, lmargin2=18, spacing1=2, spacing3=4)
-        self.reader_text.tag_configure("bullet", foreground=COLOR_TEXT, font=(FONT_UI, 12), lmargin1=18, lmargin2=36, spacing3=3)
-        self.reader_text.tag_configure("meta", foreground=COLOR_MUTED, font=(FONT_UI, 11), spacing3=3)
+        reader_left = 58
+        reader_right = 66
+        self.reader_text.tag_configure("heading", foreground=COLOR_TEXT, font=(FONT_DISPLAY, 16, "bold"), lmargin1=reader_left, lmargin2=reader_left, rmargin=reader_right, spacing1=10, spacing3=6)
+        self.reader_text.tag_configure("h1", foreground=COLOR_TEXT, font=(FONT_DISPLAY, 20, "bold"), lmargin1=reader_left, lmargin2=reader_left, rmargin=reader_right, spacing1=12, spacing3=10)
+        self.reader_text.tag_configure("h2", foreground=COLOR_BLUE_DARK, font=(FONT_DISPLAY, 17, "bold"), lmargin1=reader_left, lmargin2=reader_left, rmargin=reader_right, spacing1=18, spacing3=8)
+        self.reader_text.tag_configure("h3", foreground=COLOR_TEXT, font=(FONT_DISPLAY, 14, "bold"), lmargin1=reader_left, lmargin2=reader_left, rmargin=reader_right, spacing1=14, spacing3=6)
+        self.reader_text.tag_configure("body", foreground=COLOR_TEXT, font=(FONT_UI, 13), lmargin1=reader_left, lmargin2=reader_left, rmargin=reader_right, spacing2=5, spacing3=9)
+        self.reader_text.tag_configure("bold", font=(FONT_UI, 13, "bold"))
+        self.reader_text.tag_configure("quote", foreground=COLOR_MUTED, font=(FONT_UI, 12), lmargin1=reader_left + 14, lmargin2=reader_left + 14, rmargin=reader_right + 14, spacing1=3, spacing2=4, spacing3=6)
+        self.reader_text.tag_configure("meta", foreground=COLOR_MUTED, font=(FONT_UI, 11), lmargin1=reader_left, lmargin2=reader_left, rmargin=reader_right, spacing3=4)
         self.reader_text.tag_configure("link", foreground=COLOR_BLUE, underline=True)
         self.reader_text.tag_configure("muted", foreground=COLOR_MUTED)
+        self.reader_text.tag_configure("reader_focus", background="#fff3bf")
+        self.configure_markdown_list_tags(
+            self.reader_text,
+            font_size=13,
+            left_margin=reader_left,
+            right_margin=reader_right,
+            spacing=8,
+        )
         reader_scroll = ttk.Scrollbar(body, orient="vertical", command=self.reader_text.yview)
         self.reader_text.configure(yscrollcommand=reader_scroll.set)
         self.reader_text.pack(side="left", fill="both", expand=True)
@@ -4974,8 +5593,17 @@ class YTAudioDownloaderApp:
         ]:
             self.ui_button(actions, text, command, variant=variant, padx=12, pady=6).pack(side="left", padx=(0, 8))
 
-        hint = tk.Frame(parent, bg=COLOR_SURFACE_ALT, padx=14, pady=10)
-        hint.pack(fill="x", padx=24, pady=(0, 10))
+        hint_panel = RoundedPanel(
+            parent,
+            fill=COLOR_SURFACE_ALT,
+            outline=COLOR_BORDER,
+            radius=14,
+            inset_x=14,
+            inset_y=9,
+            height=54,
+        )
+        hint_panel.pack(fill="x", padx=24, pady=(0, 10))
+        hint = hint_panel.content
         tk.Label(
             hint,
             text="TXT 是完整转录，ZH 是中文纪要，中文译文用于逐段深读，TTS 是本地朗读音频。双击文本进入阅读页；双击音频会用系统播放器打开。",
@@ -4985,8 +5613,16 @@ class YTAudioDownloaderApp:
             anchor="w",
         ).pack(fill="x")
 
-        table_frame = tk.Frame(parent, bg=COLOR_BG, padx=24, pady=4)
-        table_frame.pack(fill="both", expand=True)
+        table_panel = RoundedPanel(
+            parent,
+            fill=COLOR_SURFACE,
+            outline=COLOR_BORDER,
+            radius=18,
+            inset_x=8,
+            inset_y=8,
+        )
+        table_panel.pack(fill="both", expand=True, padx=24, pady=(4, 18))
+        table_frame = table_panel.content
         columns = ("type", "title", "updated", "path")
         self.results_tree = ttk.Treeview(table_frame, columns=columns, show="headings", height=18)
         self.results_tree.heading("type", text="类型")
@@ -5209,7 +5845,7 @@ class YTAudioDownloaderApp:
             else:
                 library_records = []
         for record in library_records:
-            title = str(record.get("title") or "").strip()
+            title = preferred_record_title(record)
             add_record("ZH 纪要", title, record.get("digest_path"))
             add_record("TXT 转录", title, record.get("transcript_path"))
             add_record("中文译文", title, record.get("full_translation_path"))
@@ -5959,6 +6595,11 @@ class YTAudioDownloaderApp:
                 )
                 self.reader_translation_status_var.set(message)
                 self.set_status("这篇资料的中文全文正在生成，已合并本次操作...")
+                self.begin_reader_translation_progress("翻译中")
+                self.begin_immediate_task_progress(
+                    "翻译中",
+                    f"正在等待{translation_label}首段返回",
+                )
             else:
                 self.reader_translation_status_var.set("中文全文：旧转录的译文正在收尾，请稍后再点")
                 self.set_status("同一节目的旧转录仍在翻译；完成后会自动丢弃过期结果。")
@@ -5980,6 +6621,12 @@ class YTAudioDownloaderApp:
         self.full_translation_inflight[source_token] = request_state
         self.reader_translation_status_var.set(f"{translation_label}：准备按原文分段翻译...")
         self.set_status(f"正在生成{translation_label}：{display_title}")
+        self.current_task_var.set(f"当前任务：正在生成{translation_label} - {display_title}")
+        self.begin_reader_translation_progress("准备中")
+        self.begin_immediate_task_progress(
+            "准备中",
+            f"正在启动{translation_label}，等待首段返回",
+        )
 
         def worker() -> None:
             try:
@@ -6040,7 +6687,14 @@ class YTAudioDownloaderApp:
         total = max(1, int(payload.get("total") or 1))
         title = str(payload.get("title") or "当前资料")
         translation_label = str(payload.get("translation_label") or "中文全文")
+        percent = done / total * 100
         self.reader_translation_status_var.set(f"{translation_label}：正在翻译 {done}/{total} 段")
+        self.update_reader_translation_progress(percent, f"{done}/{total} 段")
+        self.update_immediate_task_progress(
+            percent,
+            f"译文 {done}/{total}",
+            f"正在翻译第 {done}/{total} 段",
+        )
         self.set_status(f"《{title}》全文翻译进度 {done}/{total}")
 
     def on_full_translation_ready(self, payload: dict) -> None:
@@ -6144,6 +6798,8 @@ class YTAudioDownloaderApp:
         if interactive:
             translation_label = str(payload.get("translation_label") or "中文全文")
             self.reader_translation_status_var.set(f"{translation_label}：生成完成，已缓存")
+            self.finish_reader_translation_progress(success=True)
+            self.finish_immediate_task_progress("译文完成")
             self.set_status(f"中文全文译文已生成：{output_path.name}")
             self.load_reader_path(
                 output_path,
@@ -6176,7 +6832,76 @@ class YTAudioDownloaderApp:
         self.set_status(f"中文全文翻译失败：{message}")
         if interactive:
             self.reader_translation_status_var.set(f"中文全文失败：{message}")
+            self.finish_reader_translation_progress(success=False)
+            self.finish_immediate_task_progress("译文失败", failed=True)
             messagebox.showerror("中文全文翻译失败", message)
+
+    def begin_reader_translation_progress(self, label: str) -> None:
+        frame = getattr(self, "reader_translation_progress_frame", None)
+        progress_bar = getattr(self, "reader_translation_progress_bar", None)
+        if not isinstance(frame, (tk.Frame, RoundedPanel)) or not isinstance(progress_bar, RoundedDinoProgressBar):
+            return
+        try:
+            if not frame.winfo_exists() or not progress_bar.winfo_exists():
+                return
+            if self.reader_translation_progress_hide_job is not None:
+                self.root.after_cancel(self.reader_translation_progress_hide_job)
+                self.reader_translation_progress_hide_job = None
+            if not frame.winfo_manager():
+                frame.pack(
+                    fill="x",
+                    pady=(0, 7),
+                    after=self.reader_translation_bar,
+                )
+            self.reader_translation_progress_value.set(0)
+            self.reader_translation_progress_label_var.set(label)
+            progress_bar.stop()
+            progress_bar.configure(mode="indeterminate")
+            progress_bar.start(84)
+        except tk.TclError:
+            return
+
+    def update_reader_translation_progress(self, percent: float, label: str) -> None:
+        progress_bar = getattr(self, "reader_translation_progress_bar", None)
+        if not isinstance(progress_bar, RoundedDinoProgressBar):
+            return
+        try:
+            if not progress_bar.winfo_exists():
+                return
+            progress_bar.stop()
+            progress_bar.configure(mode="determinate")
+            self.reader_translation_progress_value.set(max(0.0, min(100.0, percent)))
+            self.reader_translation_progress_label_var.set(label)
+        except tk.TclError:
+            return
+
+    def finish_reader_translation_progress(self, *, success: bool) -> None:
+        progress_bar = getattr(self, "reader_translation_progress_bar", None)
+        frame = getattr(self, "reader_translation_progress_frame", None)
+        if not isinstance(progress_bar, RoundedDinoProgressBar) or not isinstance(frame, tk.Frame):
+            return
+        try:
+            if not progress_bar.winfo_exists() or not frame.winfo_exists():
+                return
+            progress_bar.stop()
+            progress_bar.configure(mode="determinate")
+            self.reader_translation_progress_value.set(100.0 if success else 0.0)
+            self.reader_translation_progress_label_var.set("完成" if success else "失败")
+
+            def hide_progress() -> None:
+                self.reader_translation_progress_hide_job = None
+                try:
+                    if frame.winfo_exists():
+                        frame.pack_forget()
+                except tk.TclError:
+                    pass
+
+            self.reader_translation_progress_hide_job = self.root.after(
+                1200 if success else 2600,
+                hide_progress,
+            )
+        except tk.TclError:
+            return
 
     def translation_request_is_active(self, request_state: dict[str, object]) -> bool:
         if not request_state:
@@ -6242,6 +6967,8 @@ class YTAudioDownloaderApp:
             display_type = "ZH 纪要"
         else:
             display_type = "TXT 转录"
+        if display_type == "ZH 纪要":
+            text = normalize_research_digest_markdown(text)
         updated = datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M")
         self.reader_current_path = path
         self.reader_current_result_type = display_type
@@ -6262,6 +6989,7 @@ class YTAudioDownloaderApp:
             match = self.ensure_local_translation_record(path, display_title)
         if match:
             _record_key, record = match
+            display_title = preferred_record_title(record, display_title)
             transcript_raw = str(record.get("transcript_path") or "").strip()
             transcript_path = Path(transcript_raw).expanduser() if transcript_raw else None
             source_is_brief = bool(
@@ -6398,6 +7126,19 @@ class YTAudioDownloaderApp:
             self.insert_rendered_markdown(self.reader_text, text)
         self.reader_text.see("1.0")
         self.reader_text.configure(state="disabled")
+
+    def jump_reader_heading(self, heading: str) -> None:
+        if not hasattr(self, "reader_text"):
+            return
+        index = self.reader_text.search(heading, "1.0", stopindex="end")
+        if not index:
+            self.set_status(f"当前纪要没有「{heading}」栏目。")
+            return
+        end = f"{index}+{len(heading)}c"
+        self.reader_text.tag_remove("reader_focus", "1.0", "end")
+        self.reader_text.tag_add("reader_focus", index, end)
+        self.reader_text.see(index)
+        self.root.after(1000, lambda: self.reader_text.tag_remove("reader_focus", "1.0", "end"))
 
     def open_reader_current_path(self) -> None:
         if not self.reader_current_path:
@@ -7408,6 +8149,8 @@ class YTAudioDownloaderApp:
             webpage_url=str(record.get("webpage_url") or ""),
             source_name=str(record.get("source_name") or ""),
             published_text=str(record.get("published_text") or ""),
+            official_transcript_url=str(record.get("official_transcript_url") or ""),
+            topic=str(record.get("topic") or ""),
             play_count=parse_count(record.get("play_count")),
             importance_score=float(record.get("importance_score") or 0.0),
             investment_score=float(record.get("investment_score") or 0.0),
@@ -7435,6 +8178,10 @@ class YTAudioDownloaderApp:
             return
 
         self.auto_digests_running = True
+        self.begin_immediate_task_progress(
+            "准备中",
+            f"正在启动自动中文整理，共 {len(jobs)} 条",
+        )
         self.current_task_var.set(f"当前任务：自动中文整理 {len(jobs)} 条")
         self.events.put(("task_status", f"当前任务：自动中文整理 {len(jobs)} 条"))
         first_video_id = jobs[0][1] if jobs else ""
@@ -7522,9 +8269,18 @@ class YTAudioDownloaderApp:
                             published_text=item.published_text,
                             duration_text=item.duration_text,
                             webpage_url=item.webpage_url,
-                            topic_hint=self.current_topic,
+                            topic_hint=item.topic or self.current_topic,
                         ),
                         api_key=api_key,
+                        status_callback=lambda state, attempt, attempts, current=item, queue_index=index: self.report_model_generation_state(
+                            current.video_id,
+                            current.title,
+                            queue_index,
+                            total,
+                            state,
+                            attempt,
+                            attempts,
+                        ),
                     )
                     completed += 1
                     self.events.put(("log", f"《{item.title}》中文整理完成：{digest_path.name}"))
@@ -7561,7 +8317,7 @@ class YTAudioDownloaderApp:
                 clean_error = clean_ui_status(str(exc), 240)
                 failures.append({"title": item.title, "error": clean_error})
                 self.events.put(("log", f"《{item.title}》中文整理失败：{clean_error}"))
-                self.events.put(("row_status", (video_id, "整理失败", "查看底部提示")))
+                self.events.put(("row_status", (video_id, "整理失败", clean_ui_status(clean_error, 28))))
 
         self.events.put(
             (
@@ -7582,6 +8338,7 @@ class YTAudioDownloaderApp:
         self.auto_digests_running = False
         if hasattr(self, "progress_bar"):
             self.progress_bar.stop()
+            self.progress_bar.configure(mode="determinate")
         self.current_task_var.set("当前任务：自动中文整理完成")
         message = (
             f"自动中文整理结束：新整理 {payload['completed']} 个，"
@@ -7595,18 +8352,23 @@ class YTAudioDownloaderApp:
         else:
             self.set_status(message)
         self.progress_detail_var.set(message)
-        self.progress_value.set(100.0 if payload.get("total") else 0.0)
-        self.progress_percent_var.set("100%" if payload.get("total") else "0%")
-        self.mark_results_dirty(refresh_visible=True)
         failures = payload.get("failures") or []
+        if failures:
+            self.progress_value.set(0.0)
+            self.progress_percent_var.set(f"失败 {len(failures)} 条")
+        else:
+            self.progress_value.set(100.0 if payload.get("total") else 0.0)
+            self.progress_percent_var.set("100%" if payload.get("total") else "0%")
+        self.mark_results_dirty(refresh_visible=True)
         if failures:
             first_failure = failures[0]
             self.set_status(f"中文整理失败：{first_failure.get('title', '')[:16]} - {first_failure.get('error', '未知错误')}" )
-        video_ids = payload.get("item_ids")
-        if isinstance(video_ids, (list, tuple, set)) and video_ids:
-            self._start_research_item_translations(video_ids)
         else:
-            self._start_research_item_translations(self.pending_research_item_ids)
+            video_ids = payload.get("item_ids")
+            if isinstance(video_ids, (list, tuple, set)) and video_ids:
+                self._start_research_item_translations(video_ids)
+            else:
+                self._start_research_item_translations(self.pending_research_item_ids)
 
     def set_status(self, text: str) -> None:
         self.status_var.set(text)
@@ -7645,6 +8407,8 @@ class YTAudioDownloaderApp:
                 self.current_task_var.set(payload)
             elif event_type == "progress":
                 self.on_progress(payload)
+            elif event_type == "model_wait":
+                self.on_model_wait(payload)
             elif event_type == "download_done":
                 self.on_download_finished(payload)
             elif event_type == "queue_stopped":
@@ -7698,6 +8462,11 @@ class YTAudioDownloaderApp:
             elif event_type == "card_titles_ready":
                 self.apply_card_title_translations(payload)
             elif event_type == "card_titles_error":
+                self.set_status(payload)
+            elif event_type == "library_titles_ready":
+                self.apply_library_title_translations(payload)
+            elif event_type == "library_titles_error":
+                self.library_title_translation_running = False
                 self.set_status(payload)
             elif event_type == "card_summaries_ready":
                 self.apply_card_summary_translations(payload)
@@ -7876,6 +8645,8 @@ class YTAudioDownloaderApp:
                 published_text=str(record.get("published_text") or ""),
                 artwork_url=str(record.get("artwork_url") or ""),
                 description_text=str(record.get("description_text") or ""),
+                official_transcript_url=str(record.get("official_transcript_url") or ""),
+                topic=str(record.get("topic") or ""),
                 play_count=parse_count(record.get("play_count")),
                 importance_score=float(record.get("importance_score") or 0.0),
                 investment_score=float(record.get("investment_score") or 0.0),
@@ -7925,6 +8696,8 @@ class YTAudioDownloaderApp:
         self.current_source_label = payload["source_title"]
         self.video_items = payload["items"]
         for item in self.video_items:
+            if not item.topic:
+                item.topic = self.current_topic
             update_item_importance_score(item)
         self.video_map = {item.video_id: item for item in self.video_items}
         if persist_records:
@@ -8065,13 +8838,14 @@ class YTAudioDownloaderApp:
             "audio_url": item.audio_url,
             "artwork_url": item.artwork_url,
             "description_text": item.description_text,
+            "official_transcript_url": item.official_transcript_url,
             "play_count": item.play_count,
             "play_count_text": format_count(item.play_count),
             "importance_score": item.importance_score,
             "investment_score": item.investment_score,
             "importance_reason": item.importance_reason,
             "importance_scored_at": item.scored_at,
-            "topic": self.current_topic,
+            "topic": item.topic or self.current_topic,
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
 
@@ -8121,16 +8895,34 @@ class YTAudioDownloaderApp:
         self.start_download_queue(items)
 
     def research_selected(self) -> None:
+        self.start_research_items(self.get_selected_items())
+
+    def research_person_monitor_item(self, record: dict, person_name: str = "") -> bool:
+        item = person_monitor_video_item(record, person_name)
+        if not item.available:
+            messagebox.showwarning(
+                "暂无可转译内容",
+                "这条人物访谈还没有可下载音频或完整公开稿，可先打开原文查看。",
+            )
+            return False
+        self.video_map[item.video_id] = item
+        return self.start_research_items([item], selection_label="这条人物访谈")
+
+    def start_research_items(
+        self,
+        items: list[VideoItem],
+        *,
+        selection_label: str = "选中的",
+    ) -> bool:
         if self.researching:
             messagebox.showinfo("提示", "当前已有研究整理任务在进行中。")
-            return
+            return False
         if self.downloading:
             messagebox.showinfo("提示", "当前有下载任务在进行中，结束后再开始整理。")
-            return
-        items = self.get_selected_items()
+            return False
         if not items:
             messagebox.showwarning("提示", "请先选择至少一个节目。")
-            return
+            return False
         selected_mode = self.transcription_mode_var.get()
         if selected_mode == "极速云端":
             transcription_flow = "极速云端切片并发转录"
@@ -8141,21 +8933,21 @@ class YTAudioDownloaderApp:
         if not messagebox.askyesno(
             "确认转录整理",
             (
-                f"将整理选中的 {len(items)} 个节目。\n\n"
+                f"将整理{selection_label} {len(items)} 个节目。\n\n"
                 f"流程：下载到隐藏缓存 -> {transcription_flow} -> 生成中文研究笔记 Markdown。\n"
                 f"{fallback_note}\n"
                 "正式下载到本地仍由“下载已选/下载精选”完成。\n\n"
                 "是否开始？"
             ),
         ):
-            return
+            return False
 
         try:
             settings = self.build_transcription_settings()
             ensure_runtime_available()
         except TranscriptionError as exc:
             messagebox.showerror("无法开始整理", str(exc))
-            return
+            return False
 
         ensure_dir(RESEARCH_AUDIO_DIR)
         ensure_dir(RESEARCH_DIGEST_DIR)
@@ -8164,9 +8956,10 @@ class YTAudioDownloaderApp:
         self.pending_research_item_ids = {item.video_id for item in items}
         self.current_task_var.set(f"当前任务：准备整理 {len(items)} 个节目")
         self.set_status("研究整理队列已启动")
-        self.progress_value.set(0)
-        self.progress_percent_var.set("0%")
-        self.progress_detail_var.set("准备整理")
+        self.begin_immediate_task_progress(
+            "准备中",
+            f"正在启动转译队列，共 {len(items)} 个节目",
+        )
         browser_mode = self.browser_cookie_var.get().strip()
         if browser_mode in {"chrome", "edge", "firefox"} and not browser_is_available(browser_mode):
             browser_mode = default_browser_cookie_mode()
@@ -8183,6 +8976,7 @@ class YTAudioDownloaderApp:
             ),
             daemon=True,
         ).start()
+        return True
 
     def research_worker(
         self,
@@ -8450,9 +9244,18 @@ class YTAudioDownloaderApp:
                             published_text=item.published_text,
                             duration_text=item.duration_text,
                             webpage_url=item.webpage_url,
-                            topic_hint=self.current_topic,
+                            topic_hint=item.topic or self.current_topic,
                         ),
                         api_key=settings.api_key,
+                        status_callback=lambda state, attempt, attempts, current=item, queue_index=index: self.report_model_generation_state(
+                            current.video_id,
+                            current.title,
+                            queue_index,
+                            total,
+                            state,
+                            attempt,
+                            attempts,
+                        ),
                     )
                     completed += 1
                     digest_ready = True
@@ -8500,7 +9303,7 @@ class YTAudioDownloaderApp:
                 failed += 1
                 clean_error = clean_ui_status(str(exc), 180)
                 failures.append({"title": item.title, "error": clean_error})
-                self.events.put(("row_status", (item.video_id, "整理失败", "查看底部提示")))
+                self.events.put(("row_status", (item.video_id, "整理失败", clean_ui_status(clean_error, 28))))
                 self.events.put(("log", f"《{item.title}》整理失败：{clean_error}"))
 
         self.events.put(
@@ -8521,6 +9324,8 @@ class YTAudioDownloaderApp:
 
     def official_transcript_url_candidates(self, item: VideoItem) -> list[str]:
         candidates: list[str] = []
+        if item.official_transcript_url:
+            candidates.append(item.official_transcript_url)
         if "aidailybrief.ai/e/" in item.webpage_url:
             base = item.webpage_url.split("?", 1)[0].rstrip("/")
             candidates.append(base + "/transcript.md")
@@ -8557,6 +9362,8 @@ class YTAudioDownloaderApp:
                     last_error = f"HTTP {resp.status_code}: {body_hint}" if body_hint else f"HTTP {resp.status_code}"
                     continue
                 text = resp.text.strip()
+                if "elonmuskarchive.org/video/" in url:
+                    text = extract_elon_archive_transcript_html(item, text).strip()
                 if len(text) < 1000:
                     last_error = "返回内容太短，不像可整理文本"
                     continue
@@ -8688,10 +9495,133 @@ class YTAudioDownloaderApp:
         row_progress = payload["row_progress"]
         row_status = payload["row_status"]
 
+        if hasattr(self, "progress_bar"):
+            self.progress_bar.stop()
+            if percent <= 0:
+                self.progress_bar.configure(mode="indeterminate")
+                self.progress_bar.start(84)
+            else:
+                self.progress_bar.configure(mode="determinate")
         self.progress_value.set(percent)
-        self.progress_percent_var.set(f"{percent:.1f}%")
+        self.progress_percent_var.set("准备中" if percent <= 0 else f"{percent:.1f}%")
         self.progress_detail_var.set(detail)
         self.update_row(video_id, status=row_status, progress=row_progress)
+
+    def begin_immediate_task_progress(self, label: str, detail: str) -> None:
+        """Show the dinosaur immediately while a task has no measurable progress yet."""
+        self.progress_value.set(0.0)
+        self.progress_percent_var.set(label)
+        self.progress_detail_var.set(detail)
+        progress_bar = getattr(self, "progress_bar", None)
+        if progress_bar is None:
+            return
+        try:
+            if not progress_bar.winfo_exists():
+                return
+            progress_bar.stop()
+            progress_bar.configure(mode="indeterminate")
+            progress_bar.start(84)
+        except tk.TclError:
+            return
+
+    def update_immediate_task_progress(
+        self,
+        percent: float,
+        label: str,
+        detail: str,
+    ) -> None:
+        self.progress_value.set(max(0.0, min(100.0, percent)))
+        self.progress_percent_var.set(label)
+        self.progress_detail_var.set(detail)
+        progress_bar = getattr(self, "progress_bar", None)
+        if progress_bar is None:
+            return
+        try:
+            if not progress_bar.winfo_exists():
+                return
+            progress_bar.stop()
+            progress_bar.configure(mode="determinate")
+        except tk.TclError:
+            return
+
+    def finish_immediate_task_progress(self, label: str, *, failed: bool = False) -> None:
+        self.progress_value.set(0.0 if failed else 100.0)
+        self.progress_percent_var.set(label)
+        progress_bar = getattr(self, "progress_bar", None)
+        if progress_bar is None:
+            return
+        try:
+            if not progress_bar.winfo_exists():
+                return
+            progress_bar.stop()
+            progress_bar.configure(mode="determinate")
+        except tk.TclError:
+            return
+
+    def on_model_wait(self, payload: dict) -> None:
+        active = bool(payload.get("active"))
+        detail = str(payload.get("detail") or "正在等待模型返回")
+        if hasattr(self, "progress_bar"):
+            self.progress_bar.stop()
+            self.progress_bar.configure(mode="indeterminate" if active else "determinate")
+            if active:
+                self.progress_bar.start(84)
+        self.progress_detail_var.set(detail)
+        label = str(payload.get("label") or ("生成中" if active else ""))
+        if label:
+            self.progress_percent_var.set(label)
+        task_status = str(payload.get("task_status") or "").strip()
+        if task_status:
+            self.current_task_var.set(task_status)
+
+    def report_model_generation_state(
+        self,
+        video_id: str,
+        title: str,
+        queue_index: int,
+        queue_total: int,
+        state: str,
+        attempt: int,
+        attempts: int,
+    ) -> None:
+        state_labels = {
+            "requesting": "生成中",
+            "retrying": "重试中",
+            "succeeded": "已返回",
+            "failed": "失败",
+        }
+        active = state in {"requesting", "retrying"}
+        if state == "retrying":
+            detail = f"模型请求异常，正在自动重试第 {attempt}/{attempts} 次"
+            row_status = "中文整理重试中"
+            row_progress = f"模型 {attempt}/{attempts}"
+        elif state == "requesting":
+            detail = f"模型生成中：第 {attempt}/{attempts} 次请求，单次最长 120 秒"
+            row_status = "中文整理中"
+            row_progress = f"模型 {attempt}/{attempts}"
+        elif state == "succeeded":
+            detail = "模型已返回，正在保存中文研究笔记"
+            row_status = "中文整理中"
+            row_progress = "正在保存"
+        else:
+            detail = "模型请求失败，正在整理错误信息"
+            row_status = "整理失败"
+            row_progress = "请求失败"
+
+        self.events.put(
+            (
+                "model_wait",
+                {
+                    "active": active,
+                    "label": state_labels.get(state, "生成中"),
+                    "detail": detail,
+                    "task_status": (
+                        f"当前任务：模型整理第 {queue_index}/{queue_total} 个 - {title}"
+                    ),
+                },
+            )
+        )
+        self.events.put(("row_status", (video_id, row_status, row_progress)))
 
     def on_download_finished(self, payload: dict) -> None:
         self.downloading = False
@@ -8784,6 +9714,7 @@ class YTAudioDownloaderApp:
         self.researching = False
         if hasattr(self, "progress_bar"):
             self.progress_bar.stop()
+            self.progress_bar.configure(mode="determinate")
         lightweight = int(payload.get("lightweight") or 0)
         message = (
             f"研究整理结束：新整理 {payload['completed']} 个，"
@@ -8794,6 +9725,13 @@ class YTAudioDownloaderApp:
         self.current_task_var.set("当前任务：研究整理队列已完成")
         self.progress_detail_var.set(message)
         failures = payload.get("failures") or []
+        total = int(payload.get("total") or 0)
+        if failures:
+            self.progress_value.set(0.0)
+            self.progress_percent_var.set(f"失败 {len(failures)} 条")
+        elif total:
+            self.progress_value.set(100.0)
+            self.progress_percent_var.set("100%")
         popup_message = message
         if failures:
             first = failures[0]
@@ -8805,11 +9743,12 @@ class YTAudioDownloaderApp:
             popup_message += "\n\n结果入口：左侧「资料库」，或点击节目卡片查看详情。"
         self.mark_results_dirty(refresh_visible=True)
         messagebox.showinfo("研究整理结果", popup_message)
-        item_ids = payload.get("item_ids")
-        if isinstance(item_ids, (list, tuple, set)) and item_ids:
-            self._start_research_item_translations(item_ids)
-        else:
-            self._start_research_item_translations(self.pending_research_item_ids)
+        if not failures:
+            item_ids = payload.get("item_ids")
+            if isinstance(item_ids, (list, tuple, set)) and item_ids:
+                self._start_research_item_translations(item_ids)
+            else:
+                self._start_research_item_translations(self.pending_research_item_ids)
         self.pending_research_item_ids = set()
 
     def download_worker(

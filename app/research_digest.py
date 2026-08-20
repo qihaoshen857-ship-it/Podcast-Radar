@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import time
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -14,10 +15,110 @@ MAX_TRANSCRIPT_CHARS = 60000
 MAX_DETAIL_DESCRIPTION_CHARS = 6000
 MAX_CARD_DESCRIPTION_CHARS = 900
 MAX_FULL_TRANSLATION_CHUNK_CHARS = 10000
+DEFAULT_GENERATION_REQUEST_TIMEOUT_SECONDS = 120
+DEFAULT_GENERATION_MAX_ATTEMPTS = 2
+DEFAULT_DIGEST_MAX_TOKENS = 8192
 
 
 class ResearchDigestError(RuntimeError):
     """中文研究整理生成错误。"""
+
+
+GenerationStatusCallback = Callable[[str, int, int], None]
+
+
+def generation_error_detail(response: object) -> str:
+    """Return a compact DashScope error without dumping request content."""
+    status_code = getattr(response, "status_code", None)
+    code = str(getattr(response, "code", "") or "").strip()
+    message = str(getattr(response, "message", "") or "").strip()
+    detail = " · ".join(part for part in (code, message) if part)
+    if detail:
+        return f"HTTP {status_code}：{detail}"
+    return f"HTTP {status_code}"
+
+
+def generation_response_is_retryable(response: object) -> bool:
+    status_code = getattr(response, "status_code", None)
+    try:
+        status = int(status_code)
+    except (TypeError, ValueError):
+        return True
+    return status in {408, 409, 425, 429} or status >= 500
+
+
+def generation_exception_is_retryable(exc: Exception) -> bool:
+    message = f"{type(exc).__name__}: {exc}".lower()
+    non_retryable_markers = (
+        "invalid api key",
+        "invalidapikey",
+        "authentication",
+        "unauthorized",
+        "permission denied",
+        "forbidden",
+    )
+    return not any(marker in message for marker in non_retryable_markers)
+
+
+def call_generation_with_retry(
+    *,
+    api_key: str,
+    model: str,
+    messages: list[dict[str, str]],
+    result_format: str = "message",
+    request_timeout_seconds: int = DEFAULT_GENERATION_REQUEST_TIMEOUT_SECONDS,
+    max_attempts: int = DEFAULT_GENERATION_MAX_ATTEMPTS,
+    max_tokens: int | None = None,
+    status_callback: GenerationStatusCallback | None = None,
+) -> object:
+    """Call DashScope with a bounded wait and one transient-error retry."""
+    attempts = max(1, int(max_attempts))
+    timeout_seconds = max(10, int(request_timeout_seconds))
+    last_error = "未知错误"
+
+    for attempt in range(1, attempts + 1):
+        if status_callback:
+            status_callback("requesting", attempt, attempts)
+        try:
+            generation_options = {}
+            if max_tokens is not None:
+                generation_options["max_tokens"] = max(256, int(max_tokens))
+            response = dashscope.Generation.call(
+                api_key=api_key,
+                model=model,
+                messages=messages,
+                result_format=result_format,
+                request_timeout=timeout_seconds,
+                **generation_options,
+            )
+        except Exception as exc:  # noqa: BLE001
+            last_error = f"{type(exc).__name__}: {exc}".strip()
+            should_retry = attempt < attempts and generation_exception_is_retryable(exc)
+            if should_retry:
+                if status_callback:
+                    status_callback("retrying", attempt + 1, attempts)
+                time.sleep(1.0)
+                continue
+            if status_callback:
+                status_callback("failed", attempt, attempts)
+            raise ResearchDigestError(f"模型请求失败：{last_error}") from exc
+
+        if getattr(response, "status_code", None) == 200:
+            if status_callback:
+                status_callback("succeeded", attempt, attempts)
+            return response
+
+        last_error = generation_error_detail(response)
+        if attempt < attempts and generation_response_is_retryable(response):
+            if status_callback:
+                status_callback("retrying", attempt + 1, attempts)
+            time.sleep(1.0)
+            continue
+        if status_callback:
+            status_callback("failed", attempt, attempts)
+        raise ResearchDigestError(f"中文整理接口返回 {last_error}")
+
+    raise ResearchDigestError(f"模型请求失败：{last_error}")
 
 
 @dataclass(frozen=True)
@@ -55,6 +156,9 @@ def build_chinese_research_digest(
     metadata: DigestMetadata,
     api_key: str,
     model: str = "qwen-plus",
+    status_callback: GenerationStatusCallback | None = None,
+    request_timeout_seconds: int = DEFAULT_GENERATION_REQUEST_TIMEOUT_SECONDS,
+    max_attempts: int = DEFAULT_GENERATION_MAX_ATTEMPTS,
 ) -> Path:
     api_key = api_key.strip()
     if not api_key:
@@ -68,7 +172,7 @@ def build_chinese_research_digest(
 
     compacted = compact_transcript(transcript)
     prompt = build_digest_prompt(compacted, metadata)
-    response = dashscope.Generation.call(
+    response = call_generation_with_retry(
         api_key=api_key,
         model=model,
         messages=[
@@ -83,10 +187,16 @@ def build_chinese_research_digest(
             {"role": "user", "content": prompt},
         ],
         result_format="message",
+        request_timeout_seconds=request_timeout_seconds,
+        max_attempts=max_attempts,
+        max_tokens=DEFAULT_DIGEST_MAX_TOKENS,
+        status_callback=status_callback,
     )
-    status_code = getattr(response, "status_code", None)
-    if status_code != 200:
-        raise ResearchDigestError(f"中文整理接口返回 HTTP {status_code}：{response}")
+
+    if generation_was_truncated(response):
+        raise ResearchDigestError(
+            "中文研究笔记达到模型输出上限，为避免遗漏关键数据，本次未覆盖旧稿；请重试。"
+        )
 
     text = clean_markdown_fence(extract_generation_text(response).strip())
     if not text:
@@ -413,8 +523,14 @@ def compact_transcript(transcript: str) -> str:
 def build_digest_prompt(transcript: str, metadata: DigestMetadata) -> str:
     is_brief_fallback = "SOURCE_KIND: EPISODE_BRIEF_FALLBACK" in transcript
     source_note = (
-        "注意：输入不是完整逐字转录，而是节目简介兜底稿。输出必须明确写“基于节目简介，非完整转录”，"
-        "只做轻量判断，不要写成完整精听纪要。"
+        "严格注意：输入不是完整逐字转录，而是节目简介兜底稿。输出必须明确写"
+        "“基于节目简介，非完整转录”，只做轻量整理，不要写成完整精听纪要。"
+        "只能使用 Original episode description 和元数据逐字提供的信息；不得调用常识、记忆或外部知识补齐。"
+        "禁止补充人物履历、公司背景、币种、云厂商示例、财务口径、因果机制、报告名称、日期或具体信源。"
+        "广告主的宣传语不能扩写成节目论据。某项信息没有写在简介里，就直接省略，不能写成"
+        "“转录未明述但业界普遍认为”之类的句子。"
+        "“后续追踪”的下一步信源只能写输入中已经出现的来源；没有合适来源时统一写"
+        "“待获取完整音频或官方逐字稿”，不得编造媒体报道、数据库或未来报告。"
         if is_brief_fallback
         else ""
     )
@@ -435,20 +551,28 @@ def build_digest_prompt(transcript: str, metadata: DigestMetadata) -> str:
 
 {source_note}
 
-## 一句话判断
-用一句话说明这集是否值得我继续深听，以及最重要的原因。
+## 全文主线
+用 2-3 句话概括节目讨论的主题、核心论证和结论。不要做“值得深读/快速浏览/可以跳过”之类的价值分级。
 
 ## 核心要点
-提取 6-10 条要点。每条都要尽量具体，避免空泛判断。
+完整提取转录中具有研究价值的所有独立观点、事实、数据、案例、因果关系和争议。不设条目数量上限，不得因内容较多而删减、合并或用“等”省略。
+每条使用“**短标题**：完整说明”的形式；条目较多时可用 `###` 小标题按技术、产品、商业、案例、风险等主题分组，但仍必须保留全部要点。
+
+## 关键数据与案例
+生成正文前，先从转录开头到结尾逐段建立一份内部“数据与案例台账”，然后把台账完整写入本节。不得只挑代表性数据，也不得因为正文已经提过就省略。
+台账至少逐项检查并覆盖：
+1. 所有数字及其上下文：金额、收入、估值、融资、价格、成本、数量、用户数、参数量、算力、Token、能耗、增速、占比、倍数、区间、排名、日期、季度、年份、时长和时间点。
+2. 所有具名主体及其具体动作或结果：公司、产品、模型、人物、机构、地区、项目和政策；同一主体涉及不同指标或结论时分开列出。
+3. 所有具体案例、对比和情景：谁做了什么、前后变化、基准与结果、成功或失败原因、适用条件及例外。
+4. 所有定性但可核查的经营或产业信号，例如“收入飙升”“需求超过产能”“高度杠杆”“交付延期”；保留原始措辞及限定语，不能只保留数字。
+写完“核心要点”后逐条反查：其中每个带有事实、数字、主体动作、案例或定性产业信号的条目，都必须在本节拥有一条对应记录；“高度杠杆”“基本面未必减弱”这类限定或判断也不能遗漏。
+每条使用独立项目符号和自然中文，推荐格式为“**主体或数据**：口径、单位、时间/条件与原文结论”，不要输出内部台账式英文速记。相同数据重复出现可合并，但不同口径、时期、主体或限定条件不得合并。转录没给出的单位、币种、背景和因果关系不得推测；确实没有任何数据或案例时才省略本节。
 
 ## 中文整理稿
-用中文按逻辑重写主要内容。不是逐字翻译，但要覆盖关键论证、事实、数据、人物和因果关系。
+用中文按论证逻辑完整重写主要内容。不是逐字翻译，但要覆盖关键论证、事实、数据、人物和因果关系；使用 `###` 小标题分段，便于连续深读。
 
-## 与我的研究相关
-分为 `AI/技术`、`天气/农业`、`橡胶/大宗` 三栏；没有相关内容就写“转录未提及”。
-
-## 可继续跟踪的问题
-列出 3-6 个后续值得查证的问题。
+## 后续追踪
+最多列出 3 个最关键的后续查证问题。每个问题都要包含“问题”、“观察信号”和“下一步信源”，不得超过 3 项。
 
 ## 关键词
 列出中英文关键词，方便以后搜索。

@@ -5,6 +5,7 @@ from __future__ import annotations
 import queue
 import subprocess
 import threading
+import time
 import webbrowser
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -92,6 +93,9 @@ class PersonMonitorPage:
         self.person_buttons: dict[str, tk.Canvas] = {}
         self.refresh_queue: queue.Queue[tuple[str, Any]] = queue.Queue()
         self.is_refreshing = False
+        self.refresh_started_at = 0.0
+        self.refresh_completed_sources = 0
+        self.refresh_total_sources = 0
         self.artwork_images: dict[str, tk.PhotoImage] = {}
         self.artwork_canvases: dict[str, tuple[tk.Canvas, str]] = {}
         self.artwork_loading: set[str] = set()
@@ -274,6 +278,15 @@ class PersonMonitorPage:
             font=(FONT_UI, 10, "bold"),
         )
         self.summary_label.pack(fill="x", pady=(0, 4))
+        self.notice_label = tk.Label(
+            body,
+            textvariable=self.notice_var,
+            fg=COLOR_MUTED,
+            bg=COLOR_BG,
+            anchor="w",
+            font=(FONT_UI, 9),
+        )
+        self.notice_label.pack(fill="x", pady=(0, 7))
 
         list_shell = tk.Frame(body, bg=COLOR_BG)
         list_shell.pack(fill="both", expand=True)
@@ -463,7 +476,7 @@ class PersonMonitorPage:
         card_shell.pack(fill="x", pady=(0, 8))
 
         url = str(item.get("url") or "")
-        actions = tk.Frame(card, bg=COLOR_SURFACE, width=126, height=92)
+        actions = tk.Frame(card, bg=COLOR_SURFACE, width=170, height=92)
         actions.pack(side="right", fill="y", padx=(12, 0))
         actions.pack_propagate(False)
         tk.Label(
@@ -473,7 +486,7 @@ class PersonMonitorPage:
             bg=COLOR_SURFACE,
             justify="right",
             anchor="e",
-            wraplength=126,
+            wraplength=170,
             font=(FONT_UI, 9, "bold"),
         ).pack(fill="x", pady=(1, 2))
         tk.Label(
@@ -485,12 +498,19 @@ class PersonMonitorPage:
             anchor="e",
             font=(FONT_UI, 9),
         ).pack(fill="x")
+        action_row = tk.Frame(actions, bg=COLOR_SURFACE)
+        action_row.pack(anchor="e", pady=(4, 0))
         self._button(
-            actions,
-            "查看档案" if tier == "verified_archive" else "打开原文",
-            lambda target=url: webbrowser.open(target),
+            action_row,
+            "转译",
+            lambda record=item: self._request_transcription(record),
             primary=True,
-        ).pack(anchor="e", pady=(4, 0))
+        ).pack(side="left")
+        self._button(
+            action_row,
+            "档案" if tier == "verified_archive" else "原文",
+            lambda target=url: webbrowser.open(target),
+        ).pack(side="left", padx=(6, 0))
 
         avatar = tk.Canvas(
             card,
@@ -589,6 +609,23 @@ class PersonMonitorPage:
             font=(FONT_UI, 7, "bold"),
         )
 
+    def _request_transcription(self, item: dict[str, Any]) -> None:
+        callback = getattr(self.host, "research_person_monitor_item", None)
+        if not callable(callback):
+            self.notice_var.set("当前版本未连接转译队列，请更新 Podcast Radar。")
+            return
+        person = self.people.get(self.selected_slug, {})
+        person_name = str(
+            person.get("display_name_zh")
+            or person.get("canonical_name")
+            or self.selected_slug
+        )
+        if callback(item, person_name):
+            self.notice_var.set(
+                f"已把《{str(item.get('title') or '该访谈')[:42]}》交给转译队列，"
+                "可在页面底部查看进度。"
+            )
+
     def _schedule_artwork(self, candidate_key: str, artwork_url: str) -> None:
         self.artwork_waiters.setdefault(artwork_url, set()).add(candidate_key)
         if artwork_url not in self.artwork_loading:
@@ -666,12 +703,30 @@ class PersonMonitorPage:
     def refresh_selected(self) -> None:
         if self.is_refreshing:
             return
+        while True:
+            try:
+                self.refresh_queue.get_nowait()
+            except queue.Empty:
+                break
         self.is_refreshing = True
+        self.refresh_started_at = time.monotonic()
+        self.refresh_completed_sources = 0
         slug = self.selected_slug
-        self.host.configure_ui_button(self.refresh_button, "刷新中…", "secondary")
-        self.source_status_var.set(
-            "来源：正在并行读取固定 RSS、公开访谈档案与 Apple Podcasts…"
+        spec = self.people.get(slug, {})
+        self.refresh_total_sources = sum(
+            1
+            for source in [*spec.get("feeds", []), *spec.get("searches", [])]
+            if isinstance(source, dict) and source.get("enabled", True)
         )
+        self.host.configure_ui_button(
+            self.refresh_button,
+            f"检索 0/{self.refresh_total_sources}",
+            "secondary",
+        )
+        self.source_status_var.set(
+            f"来源：正在并行检索 {self.refresh_total_sources} 个人物信源…"
+        )
+        self.notice_var.set("检索进行中，列表会在完成后自动回到最新一条")
         worker = threading.Thread(
             target=self._refresh_worker,
             args=(slug,),
@@ -683,25 +738,87 @@ class PersonMonitorPage:
 
     def _refresh_worker(self, slug: str) -> None:
         try:
-            payload = refresh_person(slug)
+            payload = refresh_person(slug, progress_callback=self._queue_refresh_progress)
         except Exception as exc:  # noqa: BLE001 - contained inside module boundary
             self.refresh_queue.put(("error", f"{type(exc).__name__}: {exc}"))
             return
         self.refresh_queue.put(("success", payload))
 
+    def _queue_refresh_progress(
+        self,
+        completed: int,
+        total: int,
+        source_status: dict[str, Any],
+    ) -> None:
+        self.refresh_queue.put(
+            (
+                "progress",
+                {
+                    "completed": completed,
+                    "total": total,
+                    "source_status": source_status,
+                },
+            )
+        )
+
     def _poll_refresh(self) -> None:
-        try:
-            status, result = self.refresh_queue.get_nowait()
-        except queue.Empty:
+        terminal_result: tuple[str, Any] | None = None
+        while True:
+            try:
+                status, result = self.refresh_queue.get_nowait()
+            except queue.Empty:
+                break
+            if status == "progress":
+                completed = int(result.get("completed") or 0)
+                total = int(result.get("total") or self.refresh_total_sources)
+                source_status = result.get("source_status", {})
+                self.refresh_completed_sources = completed
+                source_name = str(
+                    source_status.get("source_name")
+                    or source_status.get("source_key")
+                    or "人物信源"
+                )
+                elapsed = max(0, int(time.monotonic() - self.refresh_started_at))
+                self.host.configure_ui_button(
+                    self.refresh_button,
+                    f"检索 {completed}/{total}",
+                    "secondary",
+                )
+                self.source_status_var.set(
+                    f"来源：已检索 {completed}/{total} 个信源｜"
+                    f"刚完成 {source_name}｜用时 {elapsed} 秒"
+                )
+                continue
+            terminal_result = (status, result)
+
+        if terminal_result is None:
             if self.is_refreshing:
-                self.root.after(120, self._poll_refresh)
+                elapsed = max(0, int(time.monotonic() - self.refresh_started_at))
+                self.source_status_var.set(
+                    f"来源：已检索 {self.refresh_completed_sources}/"
+                    f"{self.refresh_total_sources} 个信源｜用时 {elapsed} 秒"
+                )
+                self.root.after(200, self._poll_refresh)
             return
 
+        status, result = terminal_result
         self.is_refreshing = False
         self.host.configure_ui_button(self.refresh_button, "刷新当前人物", "primary")
         if status == "success":
             self._render(result)
-            self.notice_var.set("档案已核验优先；目录新发现继续保留待核验标记")
+            self.items_canvas.yview_moveto(0.0)
+            stats = result.get("refresh_stats", {})
+            new_count = int(stats.get("new_candidates") or 0)
+            elapsed = max(0, int(time.monotonic() - self.refresh_started_at))
+            if new_count:
+                self.notice_var.set(
+                    f"检索完成：{new_count} 条新访谈进入当前列表｜"
+                    f"用时 {elapsed} 秒"
+                )
+            else:
+                self.notice_var.set(
+                    f"检索完成：暂无比当前更新的访谈｜用时 {elapsed} 秒"
+                )
         else:
             self.source_status_var.set("来源：人物监控刷新失败，主程序其他功能不受影响")
             self.notice_var.set(str(result)[:140])
@@ -714,6 +831,12 @@ class PersonMonitorPage:
     @staticmethod
     def _needs_refresh(payload: dict[str, Any]) -> bool:
         if payload.get("seed_snapshot"):
+            return True
+        # 0.3.3 开始保留 RSS/Apple 真实音频地址。旧快照即使刚刷新过，
+        # 也要自动补齐媒体字段；已迁移的快照中可能保留少量已下架旧条目。
+        producer = payload.get("producer")
+        producer_version = str(producer.get("version") or "") if isinstance(producer, dict) else ""
+        if producer_version not in {"0.3.3"}:
             return True
         raw = str(payload.get("generated_at") or "")
         if not raw:
