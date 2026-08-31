@@ -71,7 +71,9 @@ from app.transcription import (
     TranscriptionSettings,
     ensure_runtime_available,
     load_api_key,
+    load_deepseek_api_key,
     save_api_key,
+    save_deepseek_api_key,
     transcribe_file,
 )
 
@@ -83,6 +85,11 @@ TRANSCRIPTION_MODE_OPTIONS = {
     "极速云端": "cloud_fast",
 }
 TRANSCRIPTION_MODE_LABELS = {value: key for key, value in TRANSCRIPTION_MODE_OPTIONS.items()}
+TRANSLATION_PROVIDER_OPTIONS = {
+    "阿里云百炼": "dashscope",
+    "DeepSeek": "deepseek",
+}
+TRANSLATION_PROVIDER_LABELS = {value: key for key, value in TRANSLATION_PROVIDER_OPTIONS.items()}
 REQUEST_USER_AGENT = (
     f"PodcastRadar/{APP_VERSION} "
     "(Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
@@ -92,6 +99,9 @@ PROJECT_DIR = Path(__file__).resolve().parent
 
 
 def resolve_app_dir() -> Path:
+    override_dir = os.getenv("PODCAST_RADAR_APP_DIR", "").strip()
+    if override_dir:
+        return Path(override_dir).expanduser()
     if getattr(sys, "frozen", False):
         # Keep the legacy support-directory name so an app rename never splits
         # the user's downloads, settings, cache, or research library.
@@ -2004,6 +2014,7 @@ class RoundedPanel(tk.Canvas):
         outline: str = COLOR_BORDER,
         outer_bg: str = COLOR_BG,
         radius: int = 16,
+        outline_width: int = 1,
         inset_x: int = 10,
         inset_y: int = 8,
         height: int = 1,
@@ -2019,6 +2030,7 @@ class RoundedPanel(tk.Canvas):
         self._fill = fill
         self._outline = outline
         self._radius = radius
+        self._outline_width = outline_width
         self._inset_x = inset_x
         self._inset_y = inset_y
         self._panel_shape: int | None = None
@@ -2045,7 +2057,7 @@ class RoundedPanel(tk.Canvas):
             self._radius,
             fill=self._fill,
             outline=self._outline,
-            width=1,
+            width=self._outline_width,
         )
         self.tag_lower(self._panel_shape)
         self.coords(self._content_window, self._inset_x, self._inset_y)
@@ -2054,6 +2066,26 @@ class RoundedPanel(tk.Canvas):
             width=max(1, width - self._inset_x * 2),
             height=max(1, height - self._inset_y * 2),
         )
+
+    def set_outline(self, color: str, width: int = 1) -> None:
+        self._outline = color
+        self._outline_width = width
+        self._redraw()
+
+    def fit_height_to_content(self) -> None:
+        def update_height(remaining_passes: int) -> None:
+            try:
+                if not self.winfo_exists():
+                    return
+                self.content.update_idletasks()
+                requested = self.content.winfo_reqheight() + self._inset_y * 2
+                self.configure(height=max(1, requested))
+            except tk.TclError:
+                return
+            if remaining_passes > 0:
+                self.after(40, lambda: update_height(remaining_passes - 1))
+
+        self.after_idle(lambda: update_height(2))
 
 
 PIXEL_DINO_FRAMES: tuple[tuple[str, ...], ...] = (
@@ -2522,6 +2554,14 @@ class YTAudioDownloaderApp:
         self.browser_cookie_var = tk.StringVar(value=default_browser_cookie_mode())
         self.auto_transcribe_var = tk.BooleanVar(value=True)
         self.api_key_var = tk.StringVar()
+        self.deepseek_api_key_var = tk.StringVar()
+        self.translation_provider_var = tk.StringVar(value="阿里云百炼")
+        self.translation_status_var = tk.StringVar(value="待配置 · 翻译功能暂不可用")
+        self.api_setup_seen = False
+        self.api_setup_window: tk.Toplevel | None = None
+        self.api_secret_entries: list[tk.Entry] = []
+        self.api_provider_cards: list[tuple[str, RoundedPanel]] = []
+        self.show_api_keys_var = tk.BooleanVar(value=False)
         self.transcription_mode_var = tk.StringVar(value="本地优先")
         self.target_segment_seconds_var = tk.StringVar(value="120")
         self.max_segment_seconds_var = tk.StringVar(value="180")
@@ -2570,7 +2610,8 @@ class YTAudioDownloaderApp:
         self.build_ui()
         self.root.protocol("WM_DELETE_WINDOW", self.on_app_close)
         self.root.after(120, self.process_events)
-        self.root.after(AUTO_FETCH_DELAY_MS, self.fetch_all_updates)
+        self.root.after(260, self.maybe_show_first_run_api_setup)
+        self.root.after(AUTO_FETCH_DELAY_MS, self.start_initial_fetch_when_ready)
 
     def load_settings(self) -> None:
         settings = {}
@@ -2603,6 +2644,11 @@ class YTAudioDownloaderApp:
         self.tts_instruct_var.set(str(settings.get("tts_instruct") or ""))
         self.tts_max_chars_var.set(str(settings.get("tts_max_chars") or DEFAULT_TTS_MAX_CHARS))
         self.api_key_var.set(load_api_key(DOTENV_PATH))
+        self.deepseek_api_key_var.set(load_deepseek_api_key(DOTENV_PATH))
+        saved_provider = str(settings.get("translation_provider") or "dashscope").strip().lower()
+        self.translation_provider_var.set(TRANSLATION_PROVIDER_LABELS.get(saved_provider, "阿里云百炼"))
+        self.api_setup_seen = bool(settings.get("api_setup_seen", False))
+        self.update_translation_status()
         ensure_dir(Path(default_dir))
 
     def save_settings(self) -> None:
@@ -2619,6 +2665,8 @@ class YTAudioDownloaderApp:
             "target_segment_seconds": self.target_segment_seconds_var.get().strip(),
             "max_segment_seconds": self.max_segment_seconds_var.get().strip(),
             "transcription_workers": self.transcription_workers_var.get().strip(),
+            "translation_provider": self.selected_translation_provider(),
+            "api_setup_seen": self.api_setup_seen,
             "tts_python": self.tts_python_var.get().strip(),
             "tts_model": self.tts_model_var.get().strip(),
             "tts_speaker": self.tts_speaker_var.get().strip(),
@@ -2627,6 +2675,63 @@ class YTAudioDownloaderApp:
             "tts_max_chars": self.tts_max_chars_var.get().strip(),
         }
         SETTINGS_PATH.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    def selected_translation_provider(self) -> str:
+        return TRANSLATION_PROVIDER_OPTIONS.get(self.translation_provider_var.get(), "dashscope")
+
+    def translation_api_key(self, provider: str | None = None) -> str:
+        provider = provider or self.selected_translation_provider()
+        if provider == "deepseek":
+            return self.deepseek_api_key_var.get().strip()
+        return self.api_key_var.get().strip()
+
+    def translation_provider_label(self, provider: str | None = None) -> str:
+        provider = provider or self.selected_translation_provider()
+        return TRANSLATION_PROVIDER_LABELS.get(provider, "阿里云百炼")
+
+    def update_translation_status(self) -> None:
+        provider = self.selected_translation_provider()
+        label = self.translation_provider_label(provider)
+        if self.translation_api_key(provider):
+            self.translation_status_var.set(f"已配置 · {label}")
+        else:
+            self.translation_status_var.set(f"待配置 · {label} 翻译暂不可用")
+
+    def persist_api_credentials(self) -> None:
+        save_api_key(DOTENV_PATH, self.api_key_var.get())
+        save_deepseek_api_key(DOTENV_PATH, self.deepseek_api_key_var.get())
+        self.update_translation_status()
+
+    def save_translation_settings(self, *, show_confirmation: bool = True) -> bool:
+        provider = self.selected_translation_provider()
+        if not self.translation_api_key(provider):
+            messagebox.showerror(
+                "还缺一步",
+                f"请填写 {self.translation_provider_label(provider)} API Key，或切换到已填写的服务。",
+            )
+            return False
+        self.persist_api_credentials()
+        self.api_setup_seen = True
+        self.save_settings()
+        self.set_status(f"翻译服务已设为 {self.translation_provider_label(provider)}")
+        if show_confirmation:
+            messagebox.showinfo(
+                "翻译功能已就绪",
+                f"已使用 {self.translation_provider_label(provider)} 处理中文标题、纪要和全文译文。\n\nAPI Key 只保存在本机。",
+            )
+        return True
+
+    def maybe_show_first_run_api_setup(self) -> None:
+        if self.api_setup_seen or self.translation_api_key():
+            return
+        self.show_api_setup_dialog(first_run=True)
+
+    def start_initial_fetch_when_ready(self) -> None:
+        window = self.api_setup_window
+        if isinstance(window, tk.Toplevel) and window.winfo_exists():
+            self.root.after(400, self.start_initial_fetch_when_ready)
+            return
+        self.fetch_all_updates()
 
     def load_research_library(self) -> None:
         default_payload = {"version": 1, "items": {}}
@@ -2791,6 +2896,307 @@ class YTAudioDownloaderApp:
             highlightcolor=COLOR_BLUE,
             font=(FONT_UI, 11),
         )
+
+    def ui_rounded_entry(
+        self,
+        parent: tk.Misc,
+        variable: tk.StringVar,
+        *,
+        width: int = 40,
+        show: str = "",
+    ) -> tuple[RoundedPanel, tk.Entry]:
+        shell = RoundedPanel(
+            parent,
+            fill=COLOR_INPUT,
+            outline=COLOR_BORDER,
+            outer_bg=parent.cget("bg"),
+            radius=9,
+            inset_x=10,
+            inset_y=6,
+            height=36,
+        )
+        entry = tk.Entry(
+            shell.content,
+            textvariable=variable,
+            width=width,
+            show=show,
+            bg=COLOR_INPUT,
+            fg=COLOR_TEXT,
+            insertbackground=COLOR_TEXT,
+            relief="flat",
+            borderwidth=0,
+            highlightthickness=0,
+            font=(FONT_UI, 11),
+        )
+        entry.pack(fill="both", expand=True)
+        entry.bind("<FocusIn>", lambda _event: shell.set_outline(COLOR_BLUE, 2))
+        entry.bind("<FocusOut>", lambda _event: shell.set_outline(COLOR_BORDER, 1))
+        return shell, entry
+
+    def register_api_secret_entry(self, entry: tk.Entry) -> None:
+        self.api_secret_entries.append(entry)
+        entry.configure(show="" if self.show_api_keys_var.get() else "*")
+
+    def toggle_api_key_visibility(self) -> None:
+        marker = "" if self.show_api_keys_var.get() else "*"
+        retained: list[tk.Entry] = []
+        for entry in self.api_secret_entries:
+            try:
+                if entry.winfo_exists():
+                    entry.configure(show=marker)
+                    retained.append(entry)
+            except tk.TclError:
+                continue
+        self.api_secret_entries = retained
+
+    def refresh_api_provider_cards(self) -> None:
+        selected = self.selected_translation_provider()
+        retained: list[tuple[str, RoundedPanel]] = []
+        for provider, card in self.api_provider_cards:
+            try:
+                if not card.winfo_exists():
+                    continue
+                card.set_outline(
+                    COLOR_BLUE if provider == selected else COLOR_BORDER,
+                    2 if provider == selected else 1,
+                )
+                retained.append((provider, card))
+            except tk.TclError:
+                continue
+        self.api_provider_cards = retained
+        self.update_translation_status()
+
+    def build_api_provider_cards(self, parent: tk.Misc, *, compact: bool = False) -> tk.Frame:
+        cards = tk.Frame(parent, bg=parent.cget("bg"))
+        cards.columnconfigure(0, weight=1, uniform="api-provider")
+        cards.columnconfigure(1, weight=1, uniform="api-provider")
+        cards.rowconfigure(0, weight=1)
+        specs = [
+            (
+                "dashscope",
+                "阿里云百炼",
+                "翻译 + 中文纪要 + 极速云端 ASR",
+                "DASHSCOPE_API_KEY",
+                self.api_key_var,
+            ),
+            (
+                "deepseek",
+                "DeepSeek",
+                "翻译 + 中文纪要；音频仍用本地 Whisper",
+                "DEEPSEEK_API_KEY",
+                self.deepseek_api_key_var,
+            ),
+        ]
+        for column, (provider, label, description, key_name, variable) in enumerate(specs):
+            card = RoundedPanel(
+                cards,
+                fill=COLOR_SURFACE,
+                outline=COLOR_BORDER,
+                outer_bg=cards.cget("bg"),
+                radius=16,
+                inset_x=18 if compact else 20,
+                inset_y=14 if compact else 16,
+            )
+            card.grid(row=0, column=column, sticky="nsew", padx=(0, 7) if column == 0 else (7, 0))
+            self.api_provider_cards.append((provider, card))
+            content = card.content
+            tk.Radiobutton(
+                content,
+                text=label,
+                variable=self.translation_provider_var,
+                value=TRANSLATION_PROVIDER_LABELS[provider],
+                command=self.refresh_api_provider_cards,
+                fg=COLOR_TEXT,
+                bg=COLOR_SURFACE,
+                activeforeground=COLOR_TEXT,
+                activebackground=COLOR_SURFACE,
+                selectcolor=COLOR_SURFACE,
+                font=(FONT_DISPLAY, 14, "bold"),
+                anchor="w",
+                cursor="pointinghand",
+            ).pack(fill="x", anchor="w")
+            tk.Label(
+                content,
+                text=description,
+                fg=COLOR_MUTED,
+                bg=COLOR_SURFACE,
+                font=(FONT_UI, 9),
+                justify="left",
+                anchor="w",
+                wraplength=260 if compact else 360,
+            ).pack(fill="x", anchor="w", pady=(5, 13))
+            tk.Label(
+                content,
+                text=key_name,
+                fg=COLOR_TEXT,
+                bg=COLOR_SURFACE,
+                font=(FONT_UI, 9, "bold"),
+                anchor="w",
+            ).pack(fill="x", anchor="w", pady=(0, 6))
+            entry_shell, entry = self.ui_rounded_entry(
+                content,
+                variable,
+                width=31 if compact else 42,
+                show="*",
+            )
+            entry_shell.pack(fill="x")
+            self.register_api_secret_entry(entry)
+            card.fit_height_to_content()
+        self.refresh_api_provider_cards()
+        return cards
+
+    def show_api_setup_dialog(
+        self,
+        *,
+        first_run: bool = False,
+        blocking: bool = False,
+        reason: str = "",
+    ) -> bool:
+        existing = self.api_setup_window
+        if isinstance(existing, tk.Toplevel) and existing.winfo_exists():
+            existing.lift()
+            existing.focus_force()
+            if blocking:
+                self.root.wait_window(existing)
+            return bool(self.translation_api_key())
+
+        window = tk.Toplevel(self.root)
+        self.api_setup_window = window
+        window.title("配置翻译服务")
+        window.configure(bg=COLOR_BG)
+        window.geometry("760x550")
+        window.minsize(720, 540)
+        window.transient(self.root)
+        window.grab_set()
+
+        self.root.update_idletasks()
+        x = self.root.winfo_rootx() + max(20, (self.root.winfo_width() - 760) // 2)
+        y = self.root.winfo_rooty() + max(20, (self.root.winfo_height() - 550) // 2)
+        window.geometry(f"760x550+{x}+{y}")
+
+        shell = tk.Frame(window, bg=COLOR_BG, padx=34, pady=28)
+        shell.pack(fill="both", expand=True)
+        tk.Label(
+            shell,
+            text="PODCAST RADAR · FIRST RUN" if first_run else "PODCAST RADAR · AI SETTINGS",
+            fg=COLOR_BLUE,
+            bg=COLOR_BG,
+            font=(FONT_UI, 9, "bold"),
+        ).pack(anchor="w")
+        tk.Label(
+            shell,
+            text="让英文播客直接变成中文研究材料",
+            fg=COLOR_TEXT,
+            bg=COLOR_BG,
+            font=(FONT_DISPLAY, 24, "bold"),
+        ).pack(anchor="w", pady=(9, 8))
+        intro = reason or "选择一个翻译服务并填入自己的 API Key，即可使用中文标题、研究纪要和全文译文。"
+        tk.Label(
+            shell,
+            text=intro,
+            fg=COLOR_MUTED,
+            bg=COLOR_BG,
+            font=(FONT_UI, 11),
+            justify="left",
+            anchor="w",
+            wraplength=680,
+        ).pack(fill="x", anchor="w", pady=(0, 18))
+
+        status_row = tk.Frame(shell, bg=COLOR_BG)
+        status_row.pack(fill="x", pady=(0, 14))
+        tk.Label(
+            status_row,
+            textvariable=self.translation_status_var,
+            fg=COLOR_BLUE,
+            bg=COLOR_BG,
+            font=(FONT_UI, 10, "bold"),
+        ).pack(side="left")
+        tk.Checkbutton(
+            status_row,
+            text="显示密钥",
+            variable=self.show_api_keys_var,
+            command=self.toggle_api_key_visibility,
+            fg=COLOR_MUTED,
+            bg=COLOR_BG,
+            activeforeground=COLOR_TEXT,
+            activebackground=COLOR_BG,
+            selectcolor=COLOR_BG,
+            font=(FONT_UI, 9),
+            cursor="pointinghand",
+        ).pack(side="right")
+
+        cards = self.build_api_provider_cards(shell, compact=True)
+        cards.pack(fill="x")
+
+        privacy = RoundedPanel(
+            shell,
+            fill="#eef6ff",
+            outline="#d5e8ff",
+            outer_bg=COLOR_BG,
+            radius=11,
+            inset_x=16,
+            inset_y=10,
+            height=44,
+        )
+        privacy.pack(fill="x", pady=(18, 0))
+        tk.Label(
+            privacy.content,
+            text="密钥只写入这台电脑的 .env 文件。接口调用费用由你自己的服务账户承担。",
+            fg="#24527a",
+            bg="#eef6ff",
+            font=(FONT_UI, 9),
+            justify="left",
+            anchor="w",
+        ).pack(fill="x")
+
+        actions = tk.Frame(shell, bg=COLOR_BG)
+        actions.pack(fill="x", side="bottom", pady=(22, 0))
+
+        def dismiss() -> None:
+            self.api_setup_seen = True
+            self.save_settings()
+            self.api_setup_window = None
+            window.grab_release()
+            window.destroy()
+            self.set_status("已跳过翻译服务配置，可继续使用节目发现和本地 Whisper。")
+
+        def save_and_close() -> None:
+            if not self.save_translation_settings(show_confirmation=False):
+                return
+            self.api_setup_window = None
+            window.grab_release()
+            window.destroy()
+            self.root.after(80, self.ensure_card_title_translations)
+
+        window.protocol("WM_DELETE_WINDOW", dismiss)
+        self.ui_button(
+            actions,
+            "保存并开始使用",
+            save_and_close,
+            variant="primary",
+            strong=True,
+            padx=18,
+            pady=8,
+        ).pack(side="right")
+        self.ui_button(
+            actions,
+            "稍后配置",
+            dismiss,
+            variant="secondary",
+            padx=16,
+            pady=8,
+        ).pack(side="right", padx=(0, 10))
+
+        window.after(80, window.focus_force)
+        if blocking:
+            self.root.wait_window(window)
+        return bool(self.translation_api_key())
+
+    def ensure_translation_api_ready(self, reason: str) -> bool:
+        if self.translation_api_key():
+            return True
+        self.show_api_setup_dialog(blocking=True, reason=reason)
+        return bool(self.translation_api_key())
 
     def ui_button_palette(self, variant: str) -> tuple[str, str, str]:
         palettes = {
@@ -3380,6 +3786,9 @@ class YTAudioDownloaderApp:
         units = self.card_scroll_units(event)
         if units == 0:
             return None
+        if self.is_settings_scroll_event(event):
+            self.settings_canvas.yview_scroll(units, "units")
+            return "break"
         if self.is_detail_scroll_event(event):
             canvas = self.detail_canvas
             if isinstance(canvas, tk.Canvas):
@@ -3391,6 +3800,15 @@ class YTAudioDownloaderApp:
             return None
         self.cards_canvas.yview_scroll(units, "units")
         return "break"
+
+    def is_settings_scroll_event(self, event: tk.Event) -> bool:
+        if not hasattr(self, "settings_scroll_area") or not hasattr(self, "settings_canvas"):
+            return False
+        try:
+            widget = self.root.winfo_containing(event.x_root, event.y_root)
+        except (AttributeError, tk.TclError):
+            widget = getattr(event, "widget", None)
+        return isinstance(widget, tk.Widget) and self.is_descendant(widget, self.settings_scroll_area)
 
     def is_cards_scroll_event(self, event: tk.Event) -> bool:
         if not self.cards_area or not hasattr(self, "cards_canvas"):
@@ -4817,7 +5235,23 @@ class YTAudioDownloaderApp:
         record = self.research_library.get("items", {}).get(item.video_id, {})
         if isinstance(record, dict) and record.get("detail_translation"):
             return
-        threading.Thread(target=self.detail_translation_worker, args=(item,), daemon=True).start()
+        provider = self.selected_translation_provider()
+        api_key = self.translation_api_key(provider)
+        if not api_key:
+            self.show_api_setup_dialog(
+                blocking=True,
+                reason="生成节目中文详情需要先选择翻译服务并填写自己的 API Key。",
+            )
+            provider = self.selected_translation_provider()
+            api_key = self.translation_api_key(provider)
+        if not api_key:
+            self.render_episode_detail_text(item, loading=False)
+            return
+        threading.Thread(
+            target=self.detail_translation_worker,
+            args=(item, api_key, provider),
+            daemon=True,
+        ).start()
 
     def refresh_episode_detail_translation(self, item: VideoItem) -> None:
         record = self.research_library.setdefault("items", {}).get(item.video_id, {})
@@ -4829,7 +5263,7 @@ class YTAudioDownloaderApp:
         self.render_episode_detail_text(item, loading=True)
         self.ensure_episode_detail_translation(item)
 
-    def detail_translation_worker(self, item: VideoItem) -> None:
+    def detail_translation_worker(self, item: VideoItem, api_key: str, provider: str) -> None:
         try:
             translation = build_bilingual_episode_detail(
                 EpisodeDetailMetadata(
@@ -4841,7 +5275,8 @@ class YTAudioDownloaderApp:
                     original_description=item.description_text,
                     topic_hint=self.current_topic,
                 ),
-                self.api_key_var.get().strip(),
+                api_key,
+                provider=provider,
             )
             self.events.put(("detail_translation_ready", {"video_id": item.video_id, "translation": translation}))
         except Exception as exc:  # noqa: BLE001
@@ -5114,7 +5549,8 @@ class YTAudioDownloaderApp:
         self.ensure_card_title_translations(items)
 
     def ensure_card_title_translations(self, items: list[VideoItem] | None = None) -> None:
-        api_key = self.api_key_var.get().strip()
+        provider = self.selected_translation_provider()
+        api_key = self.translation_api_key(provider)
         if not api_key:
             return
         target_items = list(items) if items is not None else list(self.video_items[:CARD_TRANSLATION_VISIBLE_LIMIT])
@@ -5127,11 +5563,16 @@ class YTAudioDownloaderApp:
             self.ensure_card_summary_translations(target_items)
             return
         self.set_status(f"正在后台翻译 {len(missing_items)} 个卡片标题...")
-        threading.Thread(target=self.card_title_translation_worker, args=(missing_items, api_key), daemon=True).start()
+        threading.Thread(
+            target=self.card_title_translation_worker,
+            args=(missing_items, api_key, provider),
+            daemon=True,
+        ).start()
         self.ensure_card_summary_translations(target_items)
 
     def ensure_card_summary_translations(self, items: list[VideoItem] | None = None) -> None:
-        api_key = self.api_key_var.get().strip()
+        provider = self.selected_translation_provider()
+        api_key = self.translation_api_key(provider)
         if not api_key:
             return
         target_items = list(items) if items is not None else list(self.video_items[:CARD_TRANSLATION_VISIBLE_LIMIT])
@@ -5143,14 +5584,22 @@ class YTAudioDownloaderApp:
         if not missing_items:
             return
         self.set_status(f"正在后台生成 {len(missing_items)} 个卡片中文简介...")
-        threading.Thread(target=self.card_summary_translation_worker, args=(missing_items, api_key), daemon=True).start()
+        threading.Thread(
+            target=self.card_summary_translation_worker,
+            args=(missing_items, api_key, provider),
+            daemon=True,
+        ).start()
 
-    def card_title_translation_worker(self, items: list[VideoItem], api_key: str) -> None:
+    def card_title_translation_worker(self, items: list[VideoItem], api_key: str, provider: str) -> None:
         try:
             batch_size = 24
             for start in range(0, len(items), batch_size):
                 batch = items[start : start + batch_size]
-                translated_titles = translate_episode_titles([item.title for item in batch], api_key)
+                translated_titles = translate_episode_titles(
+                    [item.title for item in batch],
+                    api_key,
+                    provider=provider,
+                )
                 self.events.put(
                     (
                         "card_titles_ready",
@@ -5166,7 +5615,8 @@ class YTAudioDownloaderApp:
     def ensure_library_title_translations(self) -> None:
         if self.library_title_translation_running:
             return
-        api_key = self.api_key_var.get().strip()
+        provider = self.selected_translation_provider()
+        api_key = self.translation_api_key(provider)
         if not api_key:
             return
         records = self.research_library.get("items", {})
@@ -5198,7 +5648,7 @@ class YTAudioDownloaderApp:
         self.set_status(f"正在后台汉化资料库中的 {len(targets)} 个英文标题...")
         threading.Thread(
             target=self.library_title_translation_worker,
-            args=(targets, api_key),
+            args=(targets, api_key, provider),
             daemon=True,
         ).start()
 
@@ -5206,13 +5656,18 @@ class YTAudioDownloaderApp:
         self,
         targets: list[tuple[str, str]],
         api_key: str,
+        provider: str,
     ) -> None:
         try:
             translated_by_key: dict[str, str] = {}
             batch_size = 24
             for start in range(0, len(targets), batch_size):
                 batch = targets[start : start + batch_size]
-                translated_titles = translate_episode_titles([title for _key, title in batch], api_key)
+                translated_titles = translate_episode_titles(
+                    [title for _key, title in batch],
+                    api_key,
+                    provider=provider,
+                )
                 for (record_key, original_title), translated_title in zip(batch, translated_titles):
                     cleaned = str(translated_title or "").strip()
                     if cleaned and contains_cjk(cleaned):
@@ -5240,7 +5695,7 @@ class YTAudioDownloaderApp:
         self.mark_results_dirty(refresh_visible=True)
         self.set_status(f"资料库标题汉化已更新 {updated} 条")
 
-    def card_summary_translation_worker(self, items: list[VideoItem], api_key: str) -> None:
+    def card_summary_translation_worker(self, items: list[VideoItem], api_key: str, provider: str) -> None:
         try:
             batch_size = 16
             for start in range(0, len(items), batch_size):
@@ -5256,6 +5711,7 @@ class YTAudioDownloaderApp:
                         for item in batch
                     ],
                     api_key,
+                    provider=provider,
                 )
                 self.events.put(
                     (
@@ -5642,6 +6098,93 @@ class YTAudioDownloaderApp:
         table_frame.rowconfigure(0, weight=1)
 
     def build_settings_tab(self, parent: tk.Frame) -> None:
+        self.settings_scroll_area = tk.Frame(parent, bg=COLOR_BG)
+        self.settings_scroll_area.pack(fill="both", expand=True)
+        self.settings_canvas = tk.Canvas(self.settings_scroll_area, bg=COLOR_BG, highlightthickness=0)
+        settings_scrollbar = ttk.Scrollbar(
+            self.settings_scroll_area,
+            orient="vertical",
+            command=self.settings_canvas.yview,
+        )
+        settings_content = tk.Frame(self.settings_canvas, bg=COLOR_BG)
+        settings_window = self.settings_canvas.create_window((0, 0), window=settings_content, anchor="nw")
+        self.settings_canvas.configure(yscrollcommand=settings_scrollbar.set)
+        self.settings_canvas.pack(side="left", fill="both", expand=True)
+        settings_scrollbar.pack(side="right", fill="y")
+        settings_content.bind(
+            "<Configure>",
+            lambda _event: self.settings_canvas.configure(scrollregion=self.settings_canvas.bbox("all")),
+        )
+        self.settings_canvas.bind(
+            "<Configure>",
+            lambda event: self.settings_canvas.itemconfigure(settings_window, width=event.width),
+        )
+        parent = settings_content
+
+        api_form = RoundedPanel(
+            parent,
+            fill=COLOR_SURFACE,
+            outline=COLOR_BORDER,
+            outer_bg=COLOR_BG,
+            radius=18,
+            inset_x=24,
+            inset_y=22,
+        )
+        api_form.pack(fill="x", padx=28, pady=(24, 10))
+        api_content = api_form.content
+        api_header = tk.Frame(api_content, bg=COLOR_SURFACE)
+        api_header.pack(fill="x")
+        tk.Label(
+            api_header,
+            text="AI 翻译与整理",
+            fg=COLOR_TEXT,
+            bg=COLOR_SURFACE,
+            font=(FONT_DISPLAY, 18, "bold"),
+        ).pack(side="left")
+        tk.Label(
+            api_header,
+            textvariable=self.translation_status_var,
+            fg=COLOR_BLUE,
+            bg=COLOR_SURFACE,
+            font=(FONT_UI, 10, "bold"),
+        ).pack(side="right")
+        tk.Label(
+            api_content,
+            text="选一个默认服务，用于中文标题、研究纪要和全文译文。两把密钥都只保存在本机。",
+            fg=COLOR_MUTED,
+            bg=COLOR_SURFACE,
+            font=(FONT_UI, 10),
+            justify="left",
+            anchor="w",
+        ).pack(fill="x", pady=(7, 16))
+        provider_cards = self.build_api_provider_cards(api_content)
+        provider_cards.pack(fill="x")
+        api_actions = tk.Frame(api_content, bg=COLOR_SURFACE)
+        api_actions.pack(fill="x", pady=(16, 0))
+        tk.Checkbutton(
+            api_actions,
+            text="显示密钥",
+            variable=self.show_api_keys_var,
+            command=self.toggle_api_key_visibility,
+            fg=COLOR_MUTED,
+            bg=COLOR_SURFACE,
+            activeforeground=COLOR_TEXT,
+            activebackground=COLOR_SURFACE,
+            selectcolor=COLOR_SURFACE,
+            font=(FONT_UI, 9),
+            cursor="pointinghand",
+        ).pack(side="left")
+        self.ui_button(
+            api_actions,
+            "保存翻译设置",
+            self.save_translation_settings,
+            variant="primary",
+            strong=True,
+            padx=16,
+            pady=7,
+        ).pack(side="right")
+        api_form.fit_height_to_content()
+
         download_form = tk.Frame(parent, bg=COLOR_BG, padx=28, pady=18)
         download_form.pack(fill="x")
         download_form.columnconfigure(1, weight=1)
@@ -5715,7 +6258,6 @@ class YTAudioDownloaderApp:
         ).grid(row=1, column=1, sticky="w", padx=(14, 0), pady=7)
 
         fields = [
-            ("DASHSCOPE_API_KEY（可选）", self.api_key_var, True),
             ("目标切分时长（秒）", self.target_segment_seconds_var, False),
             ("最大切分时长（秒）", self.max_segment_seconds_var, False),
             ("云端并发数", self.transcription_workers_var, False),
@@ -5737,7 +6279,7 @@ class YTAudioDownloaderApp:
 
         self.ui_label(
             form,
-            text="本地优先会先用 Whisper；极速云端会把音频切片后并发转录，缺少 Key 或云端片段失败时由本地 Whisper 补齐。",
+            text="本地优先会先用 Whisper。极速云端只使用上方的阿里云 Key；未配置时会自动改用本地 Whisper。",
             fg=COLOR_BLUE,
             bg=COLOR_BG,
         ).grid(row=7, column=0, columnspan=2, sticky="w", pady=(18, 0))
@@ -6604,13 +7146,12 @@ class YTAudioDownloaderApp:
                 self.reader_translation_status_var.set("中文全文：旧转录的译文正在收尾，请稍后再点")
                 self.set_status("同一节目的旧转录仍在翻译；完成后会自动丢弃过期结果。")
             return
-        api_key = self.api_key_var.get().strip()
-        if not api_key:
-            messagebox.showerror(
-                "缺少翻译接口",
-                "请先在“设置”页填写 DASHSCOPE_API_KEY。全文翻译只在点击后调用。",
-            )
+        if not self.ensure_translation_api_ready(
+            "生成中文全文需要一个翻译服务。选择阿里云百炼或 DeepSeek，并填入你自己的 API Key。"
+        ):
             return
+        provider = self.selected_translation_provider()
+        api_key = self.translation_api_key(provider)
 
         metadata = FullTranslationMetadata(
             title=display_title,
@@ -6636,6 +7177,7 @@ class YTAudioDownloaderApp:
                     metadata=metadata,
                     api_key=api_key,
                     model=FULL_TRANSLATION_MODEL,
+                    provider=provider,
                     progress_callback=lambda done, total: self.events.put(
                         (
                             "full_translation_progress",
@@ -7776,7 +8318,7 @@ class YTAudioDownloaderApp:
     def save_transcription_settings(self) -> None:
         try:
             self.build_transcription_settings()
-            save_api_key(DOTENV_PATH, self.api_key_var.get())
+            self.persist_api_credentials()
             self.save_settings()
         except (OSError, TranscriptionError) as exc:
             messagebox.showerror("保存失败", str(exc))
@@ -7872,13 +8414,21 @@ class YTAudioDownloaderApp:
         self.transcription_stop_requested = False
         self.transcribing = True
         self.append_transcription_log(f"转录队列已启动，共 {len(pending_paths)} 个文件。")
+        translation_provider = self.selected_translation_provider()
+        translation_api_key = self.translation_api_key(translation_provider)
         threading.Thread(
             target=self.transcription_worker,
-            args=(pending_paths, settings),
+            args=(pending_paths, settings, translation_provider, translation_api_key),
             daemon=True,
         ).start()
 
-    def transcription_worker(self, paths: list[Path], settings: TranscriptionSettings) -> None:
+    def transcription_worker(
+        self,
+        paths: list[Path],
+        settings: TranscriptionSettings,
+        translation_provider: str,
+        translation_api_key: str,
+    ) -> None:
         completed = 0
         skipped = 0
         failed = 0
@@ -7918,7 +8468,7 @@ class YTAudioDownloaderApp:
                                 },
                             )
                         )
-                    if settings.api_key.strip():
+                    if translation_api_key:
                         auto_digest_jobs.append((result.output_path, video_id))
                     else:
                         self.events.put(
@@ -7943,6 +8493,8 @@ class YTAudioDownloaderApp:
                     "stopped": self.transcription_stop_requested,
                     "auto_digest_jobs": [{"transcript_path": str(path), "video_id": video_id} for path, video_id in auto_digest_jobs],
                     "auto_api_key": settings.api_key,
+                    "translation_provider": translation_provider,
+                    "translation_api_key": translation_api_key,
                 },
             )
         )
@@ -8168,10 +8720,12 @@ class YTAudioDownloaderApp:
 
         if isinstance(payload, dict):
             raw_jobs = payload.get("jobs")
-            api_key = str(payload.get("api_key") or self.api_key_var.get()).strip()
+            provider = str(payload.get("provider") or self.selected_translation_provider()).strip()
+            api_key = str(payload.get("api_key") or self.translation_api_key(provider)).strip()
         else:
             raw_jobs = payload
-            api_key = self.api_key_var.get().strip()
+            provider = self.selected_translation_provider()
+            api_key = self.translation_api_key(provider)
 
         jobs = self._parse_auto_digest_jobs(raw_jobs)
         if not jobs:
@@ -8197,9 +8751,9 @@ class YTAudioDownloaderApp:
                 },
             )
         )
-        threading.Thread(target=self.auto_digest_worker, args=(jobs, api_key), daemon=True).start()
+        threading.Thread(target=self.auto_digest_worker, args=(jobs, api_key, provider), daemon=True).start()
 
-    def auto_digest_worker(self, jobs: list[tuple[Path, str]], api_key: str) -> None:
+    def auto_digest_worker(self, jobs: list[tuple[Path, str]], api_key: str, provider: str) -> None:
         completed = 0
         skipped = 0
         failed = 0
@@ -8272,6 +8826,7 @@ class YTAudioDownloaderApp:
                             topic_hint=item.topic or self.current_topic,
                         ),
                         api_key=api_key,
+                        provider=provider,
                         status_callback=lambda state, attempt, attempts, current=item, queue_index=index: self.report_model_generation_state(
                             current.video_id,
                             current.title,
@@ -8433,7 +8988,8 @@ class YTAudioDownloaderApp:
                             "auto_digest_jobs",
                             {
                                 "jobs": auto_jobs,
-                                "api_key": str(payload.get("auto_api_key") or self.api_key_var.get()).strip(),
+                                "api_key": str(payload.get("translation_api_key") or self.translation_api_key()).strip(),
+                                "provider": str(payload.get("translation_provider") or self.selected_translation_provider()).strip(),
                             },
                         )
                     )
@@ -8923,6 +9479,12 @@ class YTAudioDownloaderApp:
         if not items:
             messagebox.showwarning("提示", "请先选择至少一个节目。")
             return False
+        if not self.ensure_translation_api_ready(
+            "“确认转译”会在转录后生成中文研究纪要。请先选择阿里云百炼或 DeepSeek，并填入你自己的 API Key。"
+        ):
+            return False
+        translation_provider = self.selected_translation_provider()
+        translation_api_key = self.translation_api_key(translation_provider)
         selected_mode = self.transcription_mode_var.get()
         if selected_mode == "极速云端":
             transcription_flow = "极速云端切片并发转录"
@@ -8973,6 +9535,8 @@ class YTAudioDownloaderApp:
                 self.audio_format_var.get().strip(),
                 self.cookie_file_var.get().strip(),
                 browser_mode,
+                translation_provider,
+                translation_api_key,
             ),
             daemon=True,
         ).start()
@@ -8985,6 +9549,8 @@ class YTAudioDownloaderApp:
         audio_format: str,
         cookie_file: str,
         browser_cookies: str,
+        translation_provider: str,
+        translation_api_key: str,
     ) -> None:
         completed = 0
         failed = 0
@@ -9223,12 +9789,12 @@ class YTAudioDownloaderApp:
                     skipped += 1
                     digest_ready = True
                     self.events.put(("log", f"《{item.title}》中文整理已存在，已复用：{digest_path.name}"))
-                elif not settings.api_key.strip():
+                elif not translation_api_key:
                     completed += 1
                     self.events.put(
                         (
                             "log",
-                            f"《{item.title}》转录文本已就绪；未配置 DASHSCOPE_API_KEY，已跳过中文纪要。",
+                            f"《{item.title}》转录文本已就绪；未配置翻译 API，已跳过中文纪要。",
                         )
                     )
                 else:
@@ -9246,7 +9812,8 @@ class YTAudioDownloaderApp:
                             webpage_url=item.webpage_url,
                             topic_hint=item.topic or self.current_topic,
                         ),
-                        api_key=settings.api_key,
+                        api_key=translation_api_key,
+                        provider=translation_provider,
                         status_callback=lambda state, attempt, attempts, current=item, queue_index=index: self.report_model_generation_state(
                             current.video_id,
                             current.title,

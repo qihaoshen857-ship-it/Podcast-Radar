@@ -83,18 +83,26 @@ _LOCAL_WHISPER_MODELS: dict[str, WhisperModel] = {}
 _VAD_MODEL = None
 
 
-def load_api_key(dotenv_path: Path) -> str:
+def load_env_api_key(dotenv_path: Path, variable_name: str) -> str:
     load_dotenv(dotenv_path=dotenv_path, override=False)
-    return os.getenv("DASHSCOPE_API_KEY", "").strip()
+    return os.getenv(variable_name, "").strip()
 
 
-def save_api_key(dotenv_path: Path, api_key: str) -> None:
+def load_api_key(dotenv_path: Path) -> str:
+    return load_env_api_key(dotenv_path, "DASHSCOPE_API_KEY")
+
+
+def load_deepseek_api_key(dotenv_path: Path) -> str:
+    return load_env_api_key(dotenv_path, "DEEPSEEK_API_KEY")
+
+
+def save_env_api_key(dotenv_path: Path, variable_name: str, api_key: str) -> None:
     existing_lines = dotenv_path.read_text(encoding="utf-8").splitlines() if dotenv_path.exists() else []
-    replacement = f"DASHSCOPE_API_KEY={api_key.strip()}"
+    replacement = f"{variable_name}={api_key.strip()}"
     output_lines: list[str] = []
     replaced = False
     for line in existing_lines:
-        if line.strip().startswith("DASHSCOPE_API_KEY="):
+        if line.strip().startswith(f"{variable_name}="):
             output_lines.append(replacement)
             replaced = True
         else:
@@ -102,7 +110,15 @@ def save_api_key(dotenv_path: Path, api_key: str) -> None:
     if not replaced:
         output_lines.append(replacement)
     dotenv_path.write_text("\n".join(output_lines).rstrip() + "\n", encoding="utf-8")
-    os.environ["DASHSCOPE_API_KEY"] = api_key.strip()
+    os.environ[variable_name] = api_key.strip()
+
+
+def save_api_key(dotenv_path: Path, api_key: str) -> None:
+    save_env_api_key(dotenv_path, "DASHSCOPE_API_KEY", api_key)
+
+
+def save_deepseek_api_key(dotenv_path: Path, api_key: str) -> None:
+    save_env_api_key(dotenv_path, "DEEPSEEK_API_KEY", api_key)
 
 
 def ensure_runtime_available() -> None:
