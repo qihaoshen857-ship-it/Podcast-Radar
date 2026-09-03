@@ -83,6 +83,10 @@ launch_macos.command
 README_MAC.md
 ```
 
+如果你要填写自己的 API Key、替换本地 Whisper 模型，或接入其他云端 / 自建 ASR 服务，请看：
+
+- [使用与模型配置指南](docs/使用与模型配置指南.md)
+
 ## 本机使用
 
 - 打开应用后会自动读取 `双层雷达`：AI 产业、AI 创业、天气农业和科学养生播客 RSS，精选 YouTube 官方频道源与小宇宙节目页，并分区展示。
