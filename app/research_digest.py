@@ -459,7 +459,7 @@ def build_bilingual_episode_detail(
 发布时间：{metadata.published_text or '未知'}
 时长：{metadata.duration_text or '未知'}
 链接：{metadata.webpage_url or '未知'}
-主题提示：{metadata.topic_hint or 'AI、AI创业、天气、农业、橡胶观察相关研究'}
+主题提示：{metadata.topic_hint or 'AI、AI创业、具身智能、人形机器人、天气、农业、橡胶观察相关研究'}
 
 英文/原始简介：
 {source_text[:MAX_DETAIL_DESCRIPTION_CHARS]}
@@ -648,7 +648,7 @@ def build_digest_prompt(transcript: str, metadata: DigestMetadata) -> str:
         f"发布时间：{metadata.published_text or '未知'}",
         f"时长：{metadata.duration_text or '未知'}",
         f"链接：{metadata.webpage_url or '未知'}",
-        f"主题提示：{metadata.topic_hint or 'AI、AI创业、天气、农业、橡胶观察相关研究'}",
+        f"主题提示：{metadata.topic_hint or 'AI、AI创业、具身智能、人形机器人、天气、农业、橡胶观察相关研究'}",
     ]
     return f"""
 请把下面的播客转录整理成中文研究笔记。输出必须是 Markdown，结构如下：

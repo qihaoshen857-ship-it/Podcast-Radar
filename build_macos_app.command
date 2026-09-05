@@ -136,6 +136,11 @@ cat > "$PACKAGE_DIR/update-manifest.json" <<EOF
   "release_date": "$(date +%Y-%m-%d)",
   "download_url": "https://github.com/qihaoshen857-ship-it/Podcast-Radar/releases/latest",
   "release_notes": [
+    "新增机器人独立栏目，聚焦具身智能、人形本体、模型、零部件与量产应用。",
+    "7 个官方视频频道与中英文长访谈筛选共同发现节目，保留真实来源与发布日期。",
+    "机器人采用独立研究评分，区分量产计划、来源自述的交付数据，过滤纯表演与连续直播。",
+    "六个栏目按钮支持窄窗口换行，黑色选中态与刷新滑板恐龙即时反馈。",
+    "同步改进长英文标题两行显示、英文副标题、简介去重与完整标题悬停提示。",
     "人物监控卡片新增‘转译’入口，直接复用首页的下载、Whisper／阿里云 ASR 和中文研究纪要队列。",
     "人物 RSS 与 Apple Podcasts 条目保留真实音频地址、时长和简介，避免把节目网页误当成音频。",
     "Elon Musk 已核验档案优先读取完整公开 Transcript，并保留原始音视频作为备用。",
@@ -204,9 +209,11 @@ EOF
 
 cp "$ROOT_DIR/README.md" "$PACKAGE_DIR/"
 cp "$ROOT_DIR/README_MAC.md" "$PACKAGE_DIR/"
+mkdir -p "$PACKAGE_DIR/docs"
+cp "$ROOT_DIR/docs/EMBODIED_INTELLIGENCE.md" "$PACKAGE_DIR/docs/"
 
 if command -v zip >/dev/null 2>&1; then
-  (cd "$PACKAGE_DIR" && zip -qr "$ZIP_PATH" "$APP_BUNDLE" update-manifest.json README.md README_MAC.md)
+  (cd "$PACKAGE_DIR" && zip -qr "$ZIP_PATH" "$APP_BUNDLE" update-manifest.json README.md README_MAC.md docs)
 else
   echo "系统未找到 zip 命令，跳过 zip 打包。"
 fi
